@@ -7,11 +7,9 @@
 
 /* Imports */
 
-mod mandelbrot;
+pub mod mandelbrot;
 
 use std::ops::Index;
-
-pub use mandelbrot::Mandelbrot;
 
 /* Constants */
 
@@ -34,37 +32,37 @@ pub trait Fractal {//Fractals that provide iteration counts only
 
     //Constructor
     fn new(
-        max_iterations: usize,
-        x_pixels: usize, y_pixels: usize,
+        iterations: usize,
+        x_dots: usize, y_dots: usize,
         min_real: Self::FractalFloatType, max_real: Self::FractalFloatType,
         min_imag: Self::FractalFloatType, max_imag: Self::FractalFloatType
     ) -> Self;
 
     //Getters
-    fn get_max_iterations(self: &Self) -> usize;
-    fn get_x_pixels(self: &Self) -> usize;
-    fn get_y_pixels(self: &Self) -> usize;
+    fn get_iterations(self: &Self) -> usize;//Meaning depends on the fractal
+    fn get_x_dots(self: &Self) -> usize;
+    fn get_y_dots(self: &Self) -> usize;
     fn get_min_real(self: &Self) -> Self::FractalFloatType;
     fn get_max_real(self: &Self) -> Self::FractalFloatType;
     fn get_min_imag(self: &Self) -> Self::FractalFloatType;
     fn get_max_imag(self: &Self) -> Self::FractalFloatType;
-    fn get_max_threads(self: &Self) -> usize;
 
     //Setters
-    fn set_max_iterations(self: &mut Self, max_iterations: usize);
-    fn set_x_pixels(self: &mut Self, x_pixels: usize);
-    fn set_y_pixels(self: &mut Self, y_pixels: usize);
+    fn set_iterations(self: &mut Self, max_iterations: usize);//Meaning depends on the fractal
+    fn set_x_dots(self: &mut Self, x_dots: usize);
+    fn set_y_dots(self: &mut Self, y_dots: usize);
     fn set_min_real(self: &mut Self, min_real: Self::FractalFloatType);
     fn set_max_real(self: &mut Self, max_real: Self::FractalFloatType);
     fn set_min_imag(self: &mut Self, min_imag: Self::FractalFloatType);
     fn set_max_imag(self: &mut Self, max_imag: Self::FractalFloatType);
-    fn set_max_threads(self: &mut Self, max_threads: usize);
 
-    //Access Iteration Storage
-    fn iterations_ref(self: &Self) -> Option::<&[usize]>;//Returns None if update_iterations() wasn't called since the last change to arguments/since construction
+    //The meaning of what a dot is depends on the fractal
 
-    //Update Iterations
-    fn update_iterations(self: &mut Self);
+    //Access Dots Storage
+    fn dots_ref(self: &Self) -> Option::<&[usize]>;//Returns None if update() wasn't called since the last change to arguments/since construction
+
+    //Update Dots
+    fn update_dots(self: &mut Self);
 }
 
 /*impl<T> Index<usize> for T where T: Fractal {
