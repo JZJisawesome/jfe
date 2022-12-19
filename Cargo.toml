@@ -6,3 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[lib]
+name = "jfe"
+path = "src/lib.rs"
+
+[[bin]]
+name = "jfe"
+path = "src/jfe.rs"
+
+[[bin]]
+name = "jfe-server"
+path = "src/server.rs"
