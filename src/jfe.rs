@@ -15,4 +15,8 @@ fn main() {
         println!();
     }
     */
+
+    let value = jfe::ini::parse_ini_file(std::path::Path::new("test.ini"));
+
+    println!("{:?}", value);
 }

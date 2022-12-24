@@ -9,6 +9,7 @@
 
 pub mod mandelbrot;
 mod numerical_traits;
+pub mod ini;
 
 use std::ops::Index;
 
@@ -63,7 +64,7 @@ pub trait Fractal {//Fractals that provide iteration counts only
     //The meaning of what a dot is depends on the fractal
 
     //Access Dots Storage
-    fn dots_ref(self: &Self) -> Option::<&[FractalDotType]>;//Returns None if update() wasn't called since the last change to arguments/since construction
+    fn dots_ref(self: &Self) -> Option::<&[Self::FractalDotType]>;//Returns None if update() wasn't called since the last change to arguments/since construction
 
     //Update Dots
     fn update_dots(self: &mut Self);
