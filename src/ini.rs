@@ -31,7 +31,7 @@ pub type Key = String;
 
 #[derive(Debug)]
 pub enum Value {
-    Number(i128),
+    Integer(i128),
     Float(f64),
     Text(String)
 }
@@ -48,11 +48,6 @@ pub type Sections = Vec<(SectionName, Section)>;
 //pub fn map_to_fractal(fractal_ini_map: &Map) -> dyn Fractal
 
 pub fn parse_ini_file(path: &Path) -> Result<Sections, ()> {
-    /*let ini_file = File::open(path).ok()?;
-    let mut file_size = metadata(path).ok()?.len();
-    let mut file_buffer = vec![0; file_size as usize].into_boxed_slice();
-    let bytes_read =
-    */
     let file_contents_result = read(path);
     let file_contents;
     if let Ok(contents) = file_contents_result {
@@ -60,7 +55,6 @@ pub fn parse_ini_file(path: &Path) -> Result<Sections, ()> {
     } else {
         return Err(());
     }
-    println!("{:?}", file_contents);
 
     let mut global_index: usize = 0;
 
@@ -108,7 +102,7 @@ pub fn parse_ini_file(path: &Path) -> Result<Sections, ()> {
     //The main loop handles a section, then restarts
     loop {
         //Parse the section's name
-        let mut new_section_name_buffer = Vec::<u8>::with_capacity(64);
+        let mut new_section_name_buffer = Vec::<u8>::with_capacity(32);
         global_index += 1;
         while global_index < file_contents.len() {
             let character = file_contents[global_index];
@@ -131,9 +125,8 @@ pub fn parse_ini_file(path: &Path) -> Result<Sections, ()> {
             return Err(());
         }
         //At this point, new_section_name contains the section's name and global_index points to the trailing ]
-        println!("{:?}", new_section_name);
 
-        let new_section = Section::new();
+        let mut new_section = Section::new();
 
         //Ensure there is no garbage after the section name and skip to the next line
         global_index += 1;
@@ -150,39 +143,147 @@ pub fn parse_ini_file(path: &Path) -> Result<Sections, ()> {
         if global_index == file_contents.len() {//File ended immediately after the section's name
             //It is an empty section, but valid
             sections.push((new_section_name, new_section));
-            return sections;
+            return Ok(sections);
         }
         //At this point, global index points to some whitespace at the end of the section line
 
         //Parse keys and values in the section
+        loop {
+            //Skip past leading whitespace
+            loop {
+                let character = file_contents[global_index];
+                if !character.is_ascii_whitespace() {
+                    break;
+                }
 
-
-        todo!();
-
-
-        /*while global_index < file_contents.len() {
-            if file_contents[global_index] == b'[' {
                 global_index += 1;
-                break;
+                if global_index == file_contents.len() {//End of the file; push the current section name and current section and return
+                    //It is an empty section, but valid
+                    sections.push((new_section_name, new_section));
+                    return Ok(sections);
+                }
             }
+            //At this point, global_index now points to the first non-whitespace character
 
-            global_index += 1;
-        }
+            //Determine what to do based on the character
+            let first_non_whitespace_character = file_contents[global_index];
+            if first_non_whitespace_character == b';' {//A comment
+                //Skip to the end of the line
+                loop {
+                    global_index += 1;
+                    if global_index == file_contents.len() {//End of the file; push the current section name and current section and return
+                        //It is an empty section, but valid
+                        sections.push((new_section_name, new_section));
+                        return Ok(sections);
+                    }
 
-        section_name_buffer.truncate(0);
-        while global_index < file_contents.len() {
-            let character = file_contents[global_index];
-            if character == b']' {
+                    let character = file_contents[global_index];
+                    if (character == b'\n') || (character == b'\r') {//End of the line (support all platforms)
+                        break;//Go back to the start of the initial line-skipping loop
+                    }
+                }
+            } else if first_non_whitespace_character == b'[' {//Start of a new section
+                //Push the current section and name
+                sections.push((new_section_name, new_section));
+                break;//Restart the main loop, parsing the next section's name
+            } else {//This is a key-value line
+                let mut new_key_buffer = Vec::<u8>::with_capacity(32);
+                new_key_buffer.push(first_non_whitespace_character);
                 global_index += 1;
-                break;
-            }
+                while global_index < file_contents.len() {
+                    let character = file_contents[global_index];
+                    if (character == b'\n') || (character == b'\r') {//Line ended without an "=" or a value (support all platforms)
+                        return Err(());
+                    } else if character.is_ascii_whitespace() || (character == b'=') {//End of the key!
+                        break;
+                    }
 
-            section_name_buffer.push(character);
-            global_index += 1;
+                    new_key_buffer.push(character);
+                    global_index += 1;
+                }
+                if new_key_buffer.len() == 0 {//The file ended without an "=" or a value after the key
+                    return Err(());
+                }
+                let new_key;
+                if let Ok(string_from_vec) = String::from_utf8(new_key_buffer) {//Dosn't copy the contents of the vector (fast)
+                    new_key = string_from_vec;
+                } else {
+                    return Err(());
+                }
+                //At this point, global_index points to the character after the key
+
+                //Skip past whitespace and ensure there is an equal sign
+                loop {
+                    let character = file_contents[global_index];
+                    if character == b'=' {
+                        break;//Found the equals sign!
+                    } else if !character.is_ascii_whitespace() || (character == b'\n') || (character == b'\r') {//Never found = before the value or the end of the line
+                        return Err(());
+                    }
+
+                    global_index += 1;
+
+                    if global_index == file_contents.len() {
+                        return Err(());//The file ended without an "=" or a value after the key
+                    }
+                }
+                //At this point, global_index now points to the equals sign
+
+                //Skip past whitespace after the equals sign
+                loop {
+                    global_index += 1;
+                    if global_index == file_contents.len() {
+                        return Err(());//The file ended without a value after the key and the =
+                    }
+
+                    let character = file_contents[global_index];
+                    if (character == b'\n') || (character == b'\r') {//Never found the value before the end of the line
+                        return Err(());
+                    } else if !character.is_ascii_whitespace() {//Start of the value!
+                        break;
+                    }
+                }
+                //At this point, global_index now points to the first character of the value
+
+                //Get the raw value as a string
+                let mut new_raw_value_buffer = Vec::<u8>::with_capacity(32);
+                while global_index < file_contents.len() {
+                    let character = file_contents[global_index];
+                    if (character == b'\n') || (character == b'\r') {
+                        break;
+                    }
+
+                    new_raw_value_buffer.push(character);
+                    global_index += 1;
+                }
+                debug_assert!(new_raw_value_buffer.len() != 0);
+                let new_raw_value;
+                if let Ok(string_from_vec) = String::from_utf8(new_raw_value_buffer) {//Dosn't copy the contents of the vector (fast)
+                    new_raw_value = string_from_vec;
+                } else {
+                    return Err(());
+                }
+                //At this point, global_index now points to whitespace at the end of the line, or it is at the end of the file
+
+                //Try to parse the raw value string as an integer, then as a float, and then as a string
+                let new_value;
+                if let Ok(parsed_int) = new_raw_value.parse::<i128>() {
+                    new_value = Value::Integer(parsed_int);
+                } else if let Ok(parsed_float) = new_raw_value.parse::<f64>() {
+                    new_value = Value::Float(parsed_float);
+                } else {
+                    new_value = Value::Text(new_raw_value);
+                }
+
+                //Add the new key-value pair to the section
+                new_section.insert(new_key, new_value);
+
+                if global_index == file_contents.len() {//The entire file, not just the line, ended
+                    //Push the current section and name, and return it since there's nothing left
+                    sections.push((new_section_name, new_section));
+                    return Ok(sections);
+                }//Else keep looking for key-value pairs
+            }
         }
-        */
-        //FIXME need to parse a line at a time
     }
-
-    todo!();
 }
