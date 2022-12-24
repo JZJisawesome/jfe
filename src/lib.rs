@@ -8,8 +8,11 @@
 /* Imports */
 
 pub mod mandelbrot;
+mod numerical_traits;
 
 use std::ops::Index;
+
+use crate::numerical_traits::Integer;
 
 /* Constants */
 
@@ -28,6 +31,7 @@ use std::ops::Index;
 //TODO create a CustomFunctionFractal that allows the user to define custom (but slower) fractals
 
 pub trait Fractal {//Fractals that provide iteration counts only
+    type FractalDotType: Integer;
     type FractalFloatType;
 
     //Constructor
@@ -59,7 +63,7 @@ pub trait Fractal {//Fractals that provide iteration counts only
     //The meaning of what a dot is depends on the fractal
 
     //Access Dots Storage
-    fn dots_ref(self: &Self) -> Option::<&[usize]>;//Returns None if update() wasn't called since the last change to arguments/since construction
+    fn dots_ref(self: &Self) -> Option::<&[FractalDotType]>;//Returns None if update() wasn't called since the last change to arguments/since construction
 
     //Update Dots
     fn update_dots(self: &mut Self);

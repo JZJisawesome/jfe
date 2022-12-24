@@ -23,7 +23,7 @@ use crate::Fractal;
 
 /* Types */
 
-pub struct AccurateMandelbrotFractal {
+/*pub struct AccurateMandelbrotFractal {
     x_pixels: usize,
     y_pixels: usize,
     min_real: f64,
@@ -127,6 +127,8 @@ impl Fractal for AccurateMandelbrotFractal {
     }
 
 }
+
+*/
 
 /* Associated Functions and Methods */
 
