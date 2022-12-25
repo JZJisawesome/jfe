@@ -12,6 +12,8 @@ use std::ops::IndexMut;
 use crate::BaseFractal;
 use crate::EscapeTimeFractal;
 
+use core::arch::x86_64;
+
 /* Constants */
 
 //TODO
@@ -26,7 +28,7 @@ use crate::EscapeTimeFractal;
 
 /* Types */
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mandelbrot {
     max_iterations: usize,
     x_samples: usize,
@@ -72,7 +74,8 @@ impl Mandelbrot {
         };
     }
 
-    fn mandelbrot_iterations(self: &Self, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
+    #[inline(always)]
+    fn mandelbrot_iterations_universal(self: &Self, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
         //println!("mandelbrot iteration with params: {} {}", c_real, c_imag);
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
 
@@ -98,6 +101,116 @@ impl Mandelbrot {
     }
 
     #[inline(always)]
+    #[cfg(target_feature = "sse2")]
+    fn mandelbrot_iterations_sse2(self: &Self, c_real: x86_64::__m128d, c_imag: x86_64::__m128d) -> x86_64::__m128i {//Returns MAX_ITERATIONS if it is bounded
+        let diverge_threshold: f64 = 2.0;//TODO make this flexible?
+
+        unsafe {
+            let diverge_threshold_squared_f: x86_64::__m128d = x86_64::_mm_set_pd1(diverge_threshold * diverge_threshold);
+            let two_f: x86_64::__m128d = x86_64::_mm_set_pd1(2.0);
+            let one_i: x86_64::__m128i = x86_64::_mm_set1_epi64x(1);
+
+            let mut result = x86_64::_mm_set1_epi64x(0);
+
+            let mut z_real: x86_64::__m128d = x86_64::_mm_set_pd1(0.0);
+            let mut z_imag: x86_64::__m128d = x86_64::_mm_set_pd1(0.0);
+            for i in 0..self.max_iterations {
+                //Calculate some values that are used below
+                let z_real_squared: x86_64::__m128d = x86_64::_mm_mul_pd(z_real, z_real);
+                let z_imag_squared: x86_64::__m128d = x86_64::_mm_mul_pd(z_imag, z_imag);
+
+                //Check if the modulus of each z < the diverge value (aka that they haven't diverged)
+                //We do this faster by doing (z_real * z_real) + (z_imag * z_imag) < (2 * 2)
+                let squared_sum: x86_64::__m128d = x86_64::_mm_add_pd(z_real_squared, z_imag_squared);
+                let compare: x86_64::__m128i = x86_64::_mm_castpd_si128(x86_64::_mm_cmplt_pd(squared_sum, diverge_threshold_squared_f));
+
+                //If both complex numbers have diverged (entire vector is 0), return early
+                let all_diverged = x86_64::_mm_movemask_epi8(compare) == 0;
+                if all_diverged {
+                    break;
+                }
+
+                //Get next entries (For each complex number z, z_(n+1) = z_n^2 + c)
+                let temp_z_real = x86_64::_mm_add_pd(x86_64::_mm_sub_pd(z_real_squared, z_imag_squared), c_real);
+                z_imag = x86_64::_mm_add_pd(c_imag, x86_64::_mm_mul_pd(two_f, x86_64::_mm_mul_pd(z_real, z_imag)));
+                z_real = temp_z_real;
+
+                //Increment the corresponding count only if we haven't converged yet
+                let incrementor = x86_64::_mm_and_si128(compare, one_i);//If a number hasn't converged, we will increment it's count
+                result = x86_64::_mm_add_epi64(result, incrementor);
+            }
+
+            return result;
+        }
+    }
+
+    //#[inline(always)]
+    //#[target_feature(enable = "sse2")]
+    #[cfg(target_feature = "sse2")]
+    fn update_sse2(self: &mut Self) {
+        assert!((self.x_samples & 0b1) == 0);//TODO overcome this limitation
+        //TESTING
+        //unsafe { self.mandelbrot_iterations_sse2(x86_64::_mm_set_pd(0.3, 1.4), x86_64::_mm_set_pd(1234.45, 3.141592)); }
+
+        let real_length: f64 = self.max_real - self.min_real;
+        let real_step_amount: f64 = real_length / (self.x_samples as f64);
+        let imag_length: f64 = self.max_imag - self.min_imag;
+        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
+
+        //let c_reals = x86_64::_mm_set_pd(self.min_real, self.min_real + real_step_amount);
+        //for x in 0..(self.x_samples / 2) {
+        //    todo!();
+            /*
+            let mut c_imag: f64 = self.min_imag;
+            for y in 0..self.y_samples {
+                *self.at(x, y) = self.mandelbrot_iterations_universal(c_real, c_imag);
+                c_imag += imag_step_amount;
+            }
+            c_real += real_step_amount;
+            */
+        //}
+
+        let mut c_real: f64 = self.min_real;
+        for x in 0..(self.x_samples / 2) {
+            let c_reals = unsafe { x86_64::_mm_set_pd(c_real, c_real + real_step_amount) };
+
+            let mut c_imag: f64 = self.min_imag;
+            for y in 0..self.y_samples {
+                let c_imags = unsafe { x86_64::_mm_set_pd1(c_imag) };
+                let results = self.mandelbrot_iterations_sse2(c_reals, c_imags);
+
+                *self.at(x * 2, y) = unsafe { x86_64::_mm_cvtsi128_si64(results) as usize };
+
+                let swapped_results = unsafe { x86_64::_mm_shuffle_epi32(results, 0b1110) };
+
+                *self.at((x * 2) + 1, y) = unsafe { x86_64::_mm_cvtsi128_si64(swapped_results) as usize };//TESTING
+
+                c_imag += imag_step_amount;
+            }
+            c_real += real_step_amount * 2.0;
+        }
+        self.update_pending = false;
+    }
+
+    fn update_universal(self: &mut Self) {
+        let real_length: f64 = self.max_real - self.min_real;
+        let real_step_amount: f64 = real_length / (self.x_samples as f64);
+        let imag_length: f64 = self.max_imag - self.min_imag;
+        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
+
+        let mut c_real: f64 = self.min_real;
+        for x in 0..self.x_samples {
+            let mut c_imag: f64 = self.min_imag;
+            for y in 0..self.y_samples {
+                *self.at(x, y) = self.mandelbrot_iterations_universal(c_real, c_imag);
+                c_imag += imag_step_amount;
+            }
+            c_real += real_step_amount;
+        }
+        self.update_pending = false;
+    }
+
+    #[inline(always)]
     fn at(self: &mut Self, x: usize, y: usize) -> &mut usize {//unchecked for speed in release builds
         debug_assert!(x < self.x_samples);
         debug_assert!(y < self.y_samples);
@@ -118,21 +231,11 @@ impl BaseFractal for Mandelbrot {
 
     //Update Samples
     fn update(self: &mut Self) {
-        let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);
-        let imag_length: f64 = self.max_imag - self.min_imag;
-        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
-
-        let mut c_real: f64 = self.min_real;
-        for x in 0..self.x_samples {
-            let mut c_imag: f64 = self.min_imag;
-            for y in 0..self.y_samples {
-                *self.at(x, y) = self.mandelbrot_iterations(c_real, c_imag);
-                c_imag += imag_step_amount;
-            }
-            c_real += real_step_amount;
+        if cfg!(target_feature = "sse2") {
+            self.update_sse2();
+        } else {
+            self.update_universal();
         }
-        self.update_pending = false;
     }
 }
 
@@ -226,4 +329,78 @@ impl EscapeTimeFractal for Mandelbrot {
 
 /* Functions */
 
+/* Benches */
+
 //TODO
+#[cfg_attr(feature = "nightly-features-benches", cfg(test))]
+#[cfg(feature = "nightly-features-benches")]
+mod benches {
+    extern crate test;
+    use test::Bencher;
+    use super::*;
+
+    #[bench]
+    fn create_mandelbrot(b: &mut Bencher) {
+        b.iter(|| -> Mandelbrot {
+            let mandelbrot = Mandelbrot::new(
+                1024,
+                128,
+                128,
+                -2.3, 0.8,
+                -1.1, 1.1
+            );
+
+            return mandelbrot;
+        });
+    }
+
+    #[bench]
+    fn copy_overhead(b: &mut Bencher) {
+        let mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+
+        b.iter(|| -> Mandelbrot {
+            let copy = mandelbrot.clone();
+            return copy;
+        });
+    }
+
+    #[bench]
+    fn update_sse2(b: &mut Bencher) {
+        let mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            copy.update_sse2();
+            return copy;
+        });
+    }
+
+    #[bench]
+    fn update_universal(b: &mut Bencher) {
+        let mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            copy.update_universal();
+            return copy;
+        });
+    }
+}

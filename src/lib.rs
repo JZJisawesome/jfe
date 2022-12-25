@@ -5,6 +5,11 @@
  *
 */
 
+/* Nightly Features */
+
+//Only enabled if the relevant Cargo feature is
+#![cfg_attr(feature = "nightly-features-benches", feature(test))]
+
 /* Imports */
 
 pub mod mandelbrot;

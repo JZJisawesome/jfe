@@ -18,3 +18,15 @@ path = "src/jfe.rs"
 [[bin]]
 name = "jfe-server"
 path = "src/server.rs"
+
+[features]
+default = []
+nightly-features = ["nightly-features-benches"]
+nightly-features-benches = []
+
+[profile.release]
+codegen-units = 1
+strip = true
+overflow-checks = false
+panic = "abort"
+lto = true
