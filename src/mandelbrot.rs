@@ -7,7 +7,8 @@
 
 /* Imports */
 
-//use crate::Fractal;
+use crate::BaseFractal;
+use crate::EscapeTimeFractal;
 
 /* Constants */
 
@@ -22,6 +23,29 @@
 //TODO
 
 /* Types */
+
+pub struct Mandelbrot {
+    max_iterations: usize,
+    x_pixels: usize,
+    y_pixels: usize,
+    min_real: f64,
+    min_imag: f64,
+    max_real: f64,
+    max_imag: f64,
+    iterations: Vec::<usize>//For cheap resizing in case the user changes x_pixels or y_pixels
+}
+
+impl Mandelbrot {
+    pub fn new(
+        iterations: usize,
+        x_dots: usize, y_dots: usize,
+        min_real: f64, max_real: f64,
+        min_imag: f64, max_imag: f64
+    ) -> Mandelbrot {
+
+
+    }
+}
 
 /*pub struct AccurateMandelbrotFractal {
     x_pixels: usize,

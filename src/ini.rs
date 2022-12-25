@@ -48,6 +48,8 @@ pub type Sections = Vec<(SectionName, Section)>;
 /* Functions */
 
 pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, ()> {
+    //TODO optimize this function
+
     let type_string;
     let subtype_string;
 
