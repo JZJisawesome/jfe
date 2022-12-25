@@ -1,4 +1,5 @@
 use jfe::BaseFractal;
+use jfe::FractalBox::EscapeTime;
 
 fn main() {
     /*eprintln!("Creating new Mandelbrot");
@@ -20,9 +21,51 @@ fn main() {
 
     println!("{:?}", value);
 
-    let fractal_box = jfe::ini::section_to_fractal(&(value.unwrap()[0].1));
+    let mut fractal_box = jfe::ini::section_to_fractal(&(value.unwrap()[0].1)).unwrap();
 
     println!("{:?}", fractal_box);
 
-    fractal_box.unwrap().update();
+    fractal_box.update();
+
+    if let EscapeTime(escape_time_fractal) = fractal_box {
+         for y in 0..escape_time_fractal.get_y_samples() {
+            for x in 0..escape_time_fractal.get_x_samples() {
+                if escape_time_fractal.samples_ref().unwrap()[x + (y * escape_time_fractal.get_x_samples())] == escape_time_fractal.get_max_iterations() {
+                    print!("*");
+                } else {
+                    print!(" ");
+                }
+            }
+            println!();
+        }
+    }
+}
+
+fn create_tga_vec(x_pixels: u16, y_pixels: u16, bpp: u8, image_data: &[u8]) -> Vec::<u8> {
+    let mut new_vec = Vec::<u8>::with_capacity(image_data.len() + 18);
+    new_vec.push(0u8);//ID Length (unused)
+    new_vec.push(0u8);//Colour map type (no colour map)
+    new_vec.push(2u8);//Image type (uncompressed true-colour)
+
+    //Colour map (5 bytes, unused)
+    new_vec.push(0u8);//First entry index low byte (unused)
+    new_vec.push(0u8);//First entry index high byte (unused)
+    new_vec.push(0u8);//Colour map length low byte (unused)
+    new_vec.push(0u8);//Colour map length high byte (unused)
+    new_vec.push(0u8);//Colour map entry size (unused)
+
+    //Image specification (10 bytes)
+    new_vec.push(0u8);//X origin low byte (coordinates of lower left corner of image)
+    new_vec.push(0u8);//X origin high byte (coordinates of lower left corner of image)
+    new_vec.push(0u8);//Y origin low byte (coordinates of lower left corner of image)
+    new_vec.push(0u8);//Y origin high byte (coordinates of lower left corner of image)
+    new_vec.push((x_pixels & 0xFF) as u8);       //Image width low byte
+    new_vec.push(((x_pixels >> 8) & 0xFF) as u8);//Image width high byte
+    new_vec.push((y_pixels & 0xFF) as u8);       //Image height low byte
+    new_vec.push(((y_pixels >> 8) & 0xFF) as u8);//Image height high byte
+    new_vec.push(bpp);//Pixel depth
+    new_vec.push(0u8);//Image descriptor
+
+    new_vec.extend_from_slice(image_data);
+    return new_vec;
 }

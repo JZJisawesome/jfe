@@ -75,8 +75,8 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
                     escape_time_fractal_box = Box::new(crate::mandelbrot::Mandelbrot::new(
                         //TODO do this properly
                         1000,
-                        1920,
-                        1080,
+                        50,
+                        50,
                         -2.3, 0.8,
                         -1.1, 1.1
                     ));
