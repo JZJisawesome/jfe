@@ -7,7 +7,7 @@
 
 /* Imports */
 
-use crate::Fractal;
+//use crate::Fractal;
 
 /* Constants */
 

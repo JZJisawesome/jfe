@@ -10,6 +10,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::fs::read;
+use crate::FractalBox;
+use crate::EscapeTimeFractal;
 
 /* Constants */
 
@@ -45,7 +47,36 @@ pub type Sections = Vec<(SectionName, Section)>;
 
 /* Functions */
 
-//pub fn map_to_fractal(fractal_ini_map: &Map) -> dyn Fractal
+pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, ()> {
+    let type_string;
+    let subtype_string;
+
+    if let Some(Value::Text(string)) = fractal_ini_section.get("type") {
+        type_string = string.as_str();
+    } else {
+        return Err(());
+    }
+
+    if let Some(Value::Text(string)) = fractal_ini_section.get("subtype") {
+        subtype_string = string.as_str();
+    } else {
+        return Err(());
+    }
+
+    match type_string {
+        "ifs" => { todo!(); },
+        "strange_attractor" => { todo!(); },
+        "escape_time" => {
+            let escape_time_fractal_box: Box<dyn EscapeTimeFractal>;
+            todo!();
+
+            return Ok(FractalBox::EscapeTime(escape_time_fractal_box));
+        },
+        "random" => { todo!(); },
+        "finite_subdivision" => { todo!(); },
+        _ => { return Err(()); },
+    }
+}
 
 pub fn parse_ini_file(path: &Path) -> Result<Sections, ()> {
     let file_contents_result = read(path);

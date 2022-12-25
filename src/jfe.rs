@@ -19,4 +19,8 @@ fn main() {
     let value = jfe::ini::parse_ini_file(std::path::Path::new("test.ini"));
 
     println!("{:?}", value);
+
+    let fractal_box = jfe::ini::section_to_fractal(&(value.unwrap()[0].1));
+
+    println!("{:?}", fractal_box);
 }
