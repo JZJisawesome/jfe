@@ -43,10 +43,10 @@ pub enum FractalBox {
 
 pub trait BaseFractal: Debug {//Common between all fractal types
     //Getters
-    fn get_max_threads(self: &Self) -> usize;
+    fn get_max_threads(self: &Self) -> usize;//0 means all available
 
     //Setters
-    fn set_max_threads(self: &Self) -> usize;
+    fn set_max_threads(self: &mut Self, max_threads: usize);//0 means all available
 }
 
 pub trait IFSFractal: BaseFractal {
@@ -69,12 +69,12 @@ pub trait EscapeTimeFractal: BaseFractal {
 
     //Setters
     fn set_max_iterations(self: &mut Self, max_iterations: usize);
-    fn set_x_samples(self: &mut Self, x_dots: usize);
-    fn set_y_samples(self: &mut Self, y_dots: usize);
-    fn set_min_x(self: &mut Self, min_real: f64);//For the x axis or the real axis
-    fn set_max_x(self: &mut Self, max_real: f64);//For the x axis or the real axis
-    fn set_min_y(self: &mut Self, min_imag: f64);//For the y axis or the imaginary axis
-    fn set_max_y(self: &mut Self, max_imag: f64);//For the y axis or the imaginary axis
+    fn set_x_samples(self: &mut Self, x_samples: usize);
+    fn set_y_samples(self: &mut Self, y_samples: usize);
+    fn set_min_x(self: &mut Self, min_x: f64);//For the x axis or the real axis
+    fn set_max_x(self: &mut Self, max_x: f64);//For the x axis or the real axis
+    fn set_min_y(self: &mut Self, min_y: f64);//For the y axis or the imaginary axis
+    fn set_max_y(self: &mut Self, max_y: f64);//For the y axis or the imaginary axis
 
     //Access Samples Storage
     fn samples_ref(self: &Self) -> Option::<&[usize]>;//Returns None if update() wasn't called since the last change to arguments/since construction

@@ -70,7 +70,19 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
         "strange_attractor" => { todo!(); },
         "escape_time" => {
             let escape_time_fractal_box: Box<dyn EscapeTimeFractal>;
-            todo!();
+            match subtype_string {
+                "mandelbrot" => {
+                    escape_time_fractal_box = Box::new(crate::mandelbrot::Mandelbrot::new(
+                        //TODO do this properly
+                        1000,
+                        1920,
+                        1080,
+                        -2.3, 0.8,
+                        -1.1, 1.1
+                    ));
+                }
+                _ => { return Err(()); },
+            }
 
             return Ok(FractalBox::EscapeTime(escape_time_fractal_box));
         },

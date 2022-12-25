@@ -24,26 +24,149 @@ use crate::EscapeTimeFractal;
 
 /* Types */
 
+#[derive(Debug)]
 pub struct Mandelbrot {
     max_iterations: usize,
-    x_pixels: usize,
-    y_pixels: usize,
+    x_samples: usize,
+    y_samples: usize,
     min_real: f64,
     min_imag: f64,
     max_real: f64,
     max_imag: f64,
-    iterations: Vec::<usize>//For cheap resizing in case the user changes x_pixels or y_pixels
+    max_threads: usize,
+
+
+    iterations: Vec::<usize>,//For cheap resizing in case the user changes x_samples or y_samples
+    update_pending: bool,
 }
 
 impl Mandelbrot {
     pub fn new(
-        iterations: usize,
-        x_dots: usize, y_dots: usize,
+        max_iterations: usize,
+        x_samples: usize, y_samples: usize,
         min_real: f64, max_real: f64,
         min_imag: f64, max_imag: f64
     ) -> Mandelbrot {
+        assert!(max_iterations > 0, "Must at least iterate once");
+        assert!(x_samples != 0, "x_samples must be non-zero");
+        assert!(y_samples != 0, "y_samples must be non-zero");
+        assert!(min_real < max_real, "min_real must be < max_real");
+        assert!(min_imag < max_imag, "min_imag must be < max_imag");
 
+        let mut new_iterations_vec = Vec::<usize>::with_capacity(x_samples * y_samples);
+        new_iterations_vec.resize(x_samples * y_samples, 0);
 
+        let mut new_mandelbrot = Mandelbrot {
+            max_iterations: max_iterations,
+            x_samples: x_samples,
+            y_samples: y_samples,
+            min_real: min_real,
+            min_imag: min_imag,
+            max_real: max_real,
+            max_imag: max_imag,
+            max_threads: 1,
+
+            iterations: new_iterations_vec,
+            update_pending: true
+        };
+        return new_mandelbrot;
+    }
+}
+
+impl BaseFractal for Mandelbrot {
+    //Getters
+    fn get_max_threads(self: &Self) -> usize {
+        return self.max_threads;
+    }
+
+    //Setters
+    fn set_max_threads(self: &mut Self, max_threads: usize) {
+        self.max_threads = max_threads;
+    }
+}
+
+impl EscapeTimeFractal for Mandelbrot {
+    //Getters
+    fn get_max_iterations(self: &Self) -> usize {
+        return self.max_iterations;
+    }
+
+    fn get_x_samples(self: &Self) -> usize {
+        return self.x_samples;
+    }
+
+    fn get_y_samples(self: &Self) -> usize {
+        return self.y_samples;
+    }
+
+    fn get_min_x(self: &Self) -> f64 {
+        return self.min_real;
+    }
+
+    fn get_max_x(self: &Self) -> f64 {
+        return self.min_imag;
+    }
+
+    fn get_min_y(self: &Self) -> f64 {
+        return self.max_real;
+    }
+
+    fn get_max_y(self: &Self) -> f64 {
+        return self.max_imag;
+    }
+
+    //Setters
+    fn set_max_iterations(self: &mut Self, max_iterations: usize) {
+        assert!(max_iterations > 0, "Must at least iterate once");
+        self.max_iterations = max_iterations;
+        self.update_pending = true;
+    }
+
+    fn set_x_samples(self: &mut Self, x_samples: usize) {
+        assert!(x_samples != 0, "x_samples must be non-zero");
+        self.x_samples = x_samples;
+        self.update_pending = true;
+    }
+
+    fn set_y_samples(self: &mut Self, y_samples: usize) {
+        assert!(y_samples != 0, "y_samples must be non-zero");
+        self.y_samples = y_samples;
+        self.update_pending = true;
+    }
+
+    fn set_min_x(self: &mut Self, min_real: f64) {
+        self.update_pending = true;
+        todo!();
+    }
+
+    fn set_max_x(self: &mut Self, max_real: f64) {
+        self.update_pending = true;
+        todo!();
+    }
+
+    fn set_min_y(self: &mut Self, min_imag: f64) {
+        self.update_pending = true;
+        todo!();
+    }
+
+    fn set_max_y(self: &mut Self, max_imag: f64) {
+        self.update_pending = true;
+        todo!();
+    }
+
+    //Access Samples Storage
+    fn samples_ref(self: &Self) -> Option::<&[usize]> {//Returns None if update() wasn't called since the last change to arguments/since construction
+        if self.update_pending {
+            return None;
+        }
+
+        todo!();
+    }
+
+    //Update Samples
+    fn update_samples(self: &mut Self) {
+        self.update_pending = false;
+        todo!();
     }
 }
 
