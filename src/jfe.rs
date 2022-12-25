@@ -38,6 +38,19 @@ fn main() {
             }
             println!();
         }
+
+        let mut tga_image_data = Vec::<u8>::with_capacity(escape_time_fractal.get_x_samples() * escape_time_fractal.get_y_samples() * 3);
+        for y in 0..escape_time_fractal.get_y_samples() {
+            for x in 0..escape_time_fractal.get_x_samples() {
+                let value = escape_time_fractal.samples_ref().unwrap()[x + (y * escape_time_fractal.get_x_samples())];
+                tga_image_data.push(value as u8);
+                tga_image_data.push(value as u8);
+                tga_image_data.push(value as u8);
+            }
+        }
+
+        let tga_file_vec = create_tga_vec(escape_time_fractal.get_x_samples() as u16, escape_time_fractal.get_y_samples() as u16, 24, &tga_image_data);
+        std::fs::write("test_image.tga", &tga_file_vec);
     }
 }
 

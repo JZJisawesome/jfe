@@ -179,12 +179,16 @@ impl EscapeTimeFractal for Mandelbrot {
         assert!(x_samples != 0, "x_samples must be non-zero");
         self.x_samples = x_samples;
         self.update_pending = true;
+        self.iterations.reserve(x_samples * self.y_samples);
+        self.iterations.resize(x_samples * self.y_samples, 0);
     }
 
     fn set_y_samples(self: &mut Self, y_samples: usize) {
         assert!(y_samples != 0, "y_samples must be non-zero");
         self.y_samples = y_samples;
         self.update_pending = true;
+        self.iterations.reserve(self.x_samples * y_samples);
+        self.iterations.resize(self.x_samples * y_samples, 0);
     }
 
     fn set_min_x(self: &mut Self, min_real: f64) {

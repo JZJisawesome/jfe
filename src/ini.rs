@@ -69,19 +69,68 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
         "ifs" => { todo!(); },
         "strange_attractor" => { todo!(); },
         "escape_time" => {
-            let escape_time_fractal_box: Box<dyn EscapeTimeFractal>;
+            let mut escape_time_fractal_box: Box<dyn EscapeTimeFractal>;
             match subtype_string {
                 "mandelbrot" => {
                     escape_time_fractal_box = Box::new(crate::mandelbrot::Mandelbrot::new(
-                        //TODO do this properly
-                        1000,
-                        50,
-                        50,
-                        -2.3, 0.8,
-                        -1.1, 1.1
+                        //TODO do this properly so that setting min_x and max_x individually work
+                        1,
+                        1,
+                        1,
+                        -100000000.0, 100000000.0,
+                        -100000000.0, 100000000.0
                     ));
                 }
                 _ => { return Err(()); },
+            }
+
+            if let Some(Value::Integer(int)) = fractal_ini_section.get("max_iterations") {
+                //assert!(int < max usize);//TODO proper error handling
+                escape_time_fractal_box.set_max_iterations(*int as usize);
+            } else {
+                return Err(());
+            }
+
+            if let Some(Value::Integer(int)) = fractal_ini_section.get("x_samples") {
+                //assert!(int < max usize);//TODO proper error handling
+                escape_time_fractal_box.set_x_samples(*int as usize);
+            } else {
+                return Err(());
+            }
+
+            if let Some(Value::Integer(int)) = fractal_ini_section.get("y_samples") {
+                //assert!(int < max usize);//TODO proper error handling
+                escape_time_fractal_box.set_y_samples(*int as usize);
+            } else {
+                return Err(());
+            }
+
+            if let Some(Value::Float(float)) = fractal_ini_section.get("min_x") {
+                //TODO return error rather than panic if it is greater than max_x
+                escape_time_fractal_box.set_min_x(*float);
+            } else {
+                return Err(());
+            }
+
+            if let Some(Value::Float(float)) = fractal_ini_section.get("max_x") {
+                //TODO return error rather than panic if it is less than min_x
+                escape_time_fractal_box.set_max_x(*float);
+            } else {
+                return Err(());
+            }
+
+            if let Some(Value::Float(float)) = fractal_ini_section.get("min_y") {
+                //TODO return error rather than panic if it is greater than max_y
+                escape_time_fractal_box.set_min_y(*float);
+            } else {
+                return Err(());
+            }
+
+            if let Some(Value::Float(float)) = fractal_ini_section.get("max_y") {
+                //TODO return error rather than panic if it is less than min_y
+                escape_time_fractal_box.set_max_y(*float);
+            } else {
+                return Err(());
             }
 
             return Ok(FractalBox::EscapeTime(escape_time_fractal_box));
