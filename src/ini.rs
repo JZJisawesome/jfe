@@ -73,12 +73,11 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
             match subtype_string {
                 "mandelbrot" => {
                     escape_time_fractal_box = Box::new(crate::mandelbrot::Mandelbrot::new(
-                        //TODO do this properly so that setting min_x and max_x individually work
                         1,
                         1,
                         1,
-                        -100000000.0, 100000000.0,
-                        -100000000.0, 100000000.0
+                        0.0, 0.0,
+                        0.0, 0.0,
                     ));
                 }
                 _ => { return Err(()); },

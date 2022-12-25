@@ -2,6 +2,39 @@ use jfe::BaseFractal;
 use jfe::FractalBox::EscapeTime;
 
 fn main() {
+    if let Ok(sections) = jfe::ini::parse_ini_file(std::path::Path::new("../../examples.ini")) {
+        for (section_name, section) in sections {
+            println!("Processing the {} section", section_name);
+            if let Ok(fractal_box) = jfe::ini::section_to_fractal(&section) {
+                match fractal_box {
+                    EscapeTime(mut fractal) => {
+                        fractal.update();
+                        //TODO what if it is not 255 max iterations?
+
+                        let mut tga_image_data = Vec::<u8>::with_capacity(fractal.get_x_samples() * fractal.get_y_samples() * 3);
+
+                        for y in 0..fractal.get_y_samples() {
+                            for x in 0..fractal.get_x_samples() {
+                                let value = fractal.samples_ref().unwrap()[x + (y * fractal.get_x_samples())];
+                                tga_image_data.push(value as u8);
+                                tga_image_data.push(value as u8);
+                                tga_image_data.push(value as u8);
+                            }
+                        }
+
+                        let tga_file_vec = create_tga_vec(fractal.get_x_samples() as u16, fractal.get_y_samples() as u16, 24, &tga_image_data);
+                        std::fs::write(section_name + ".tga", &tga_file_vec);
+                    }
+                    _ => { todo!(); }
+                }
+            } else {
+                println!("Failed to parse the {} section", section_name);
+            }
+        }
+    } else {
+        println!("Failed to parse ini");
+    }
+
     /*eprintln!("Creating new Mandelbrot");
     let mandelbrot = Mandelbrot::<255>::new(75, 30, -2.3, -1.1, 0.8, 1.1);
 
@@ -17,6 +50,7 @@ fn main() {
     }
     */
 
+    /*
     let value = jfe::ini::parse_ini_file(std::path::Path::new("test.ini"));
 
     println!("{:?}", value);
@@ -52,6 +86,7 @@ fn main() {
         let tga_file_vec = create_tga_vec(escape_time_fractal.get_x_samples() as u16, escape_time_fractal.get_y_samples() as u16, 24, &tga_image_data);
         std::fs::write("test_image.tga", &tga_file_vec);
     }
+    */
 }
 
 fn create_tga_vec(x_pixels: u16, y_pixels: u16, bpp: u8, image_data: &[u8]) -> Vec::<u8> {

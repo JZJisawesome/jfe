@@ -43,6 +43,7 @@ pub struct Mandelbrot {
 }
 
 impl Mandelbrot {
+    //NOTE: it is okay if min/max real/imag values are flipped, it will just flip the image
     pub fn new(
         max_iterations: usize,
         x_samples: usize, y_samples: usize,
@@ -52,8 +53,6 @@ impl Mandelbrot {
         assert!(max_iterations > 0, "Must at least iterate once");
         assert!(x_samples != 0, "x_samples must be non-zero");
         assert!(y_samples != 0, "y_samples must be non-zero");
-        assert!(min_real < max_real, "min_real must be < max_real");
-        assert!(min_imag < max_imag, "min_imag must be < max_imag");
 
         let mut new_iterations_vec = Vec::<usize>::with_capacity(x_samples * y_samples);
         new_iterations_vec.resize(x_samples * y_samples, 0);
@@ -192,25 +191,21 @@ impl EscapeTimeFractal for Mandelbrot {
     }
 
     fn set_min_x(self: &mut Self, min_real: f64) {
-        assert!(min_real < self.max_real, "min_real must be < max_real");
         self.min_real = min_real;
         self.update_pending = true;
     }
 
     fn set_max_x(self: &mut Self, max_real: f64) {
-        assert!(self.min_real < max_real, "min_real must be < max_real");
         self.max_real = max_real;
         self.update_pending = true;
     }
 
     fn set_min_y(self: &mut Self, min_imag: f64) {
-        assert!(min_imag < self.max_imag, "min_imag must be < max_imag");
         self.min_imag = min_imag;
         self.update_pending = true;
     }
 
     fn set_max_y(self: &mut Self, max_imag: f64) {
-        assert!(self.min_imag < max_imag, "min_imag must be < max_imag");
         self.max_imag = max_imag;
         self.update_pending = true;
     }
