@@ -83,6 +83,12 @@ impl BaseFractal for Mandelbrot {
     fn set_max_threads(self: &mut Self, max_threads: usize) {
         self.max_threads = max_threads;
     }
+
+    //Update Samples
+    fn update(self: &mut Self) {
+        self.update_pending = false;
+        todo!();
+    }
 }
 
 impl EscapeTimeFractal for Mandelbrot {
@@ -116,6 +122,7 @@ impl EscapeTimeFractal for Mandelbrot {
     }
 
     //Setters
+    //TODO only set update_pending if it changed
     fn set_max_iterations(self: &mut Self, max_iterations: usize) {
         assert!(max_iterations > 0, "Must at least iterate once");
         self.max_iterations = max_iterations;
@@ -135,23 +142,27 @@ impl EscapeTimeFractal for Mandelbrot {
     }
 
     fn set_min_x(self: &mut Self, min_real: f64) {
+        assert!(min_real < self.max_real, "min_real must be < max_real");
+        self.min_real = min_real;
         self.update_pending = true;
-        todo!();
     }
 
     fn set_max_x(self: &mut Self, max_real: f64) {
+        assert!(self.min_real < max_real, "min_real must be < max_real");
+        self.max_real = max_real;
         self.update_pending = true;
-        todo!();
     }
 
     fn set_min_y(self: &mut Self, min_imag: f64) {
+        assert!(min_imag < self.max_imag, "min_imag must be < max_imag");
+        self.min_imag = min_imag;
         self.update_pending = true;
-        todo!();
     }
 
     fn set_max_y(self: &mut Self, max_imag: f64) {
+        assert!(self.min_imag < max_imag, "min_imag must be < max_imag");
+        self.max_imag = max_imag;
         self.update_pending = true;
-        todo!();
     }
 
     //Access Samples Storage
@@ -160,12 +171,6 @@ impl EscapeTimeFractal for Mandelbrot {
             return None;
         }
 
-        todo!();
-    }
-
-    //Update Samples
-    fn update_samples(self: &mut Self) {
-        self.update_pending = false;
         todo!();
     }
 }

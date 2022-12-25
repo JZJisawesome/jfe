@@ -47,6 +47,9 @@ pub trait BaseFractal: Debug {//Common between all fractal types
 
     //Setters
     fn set_max_threads(self: &mut Self, max_threads: usize);//0 means all available
+
+    //Update the fractal when settings were changed
+    fn update(self: &mut Self);
 }
 
 pub trait IFSFractal: BaseFractal {
@@ -78,9 +81,6 @@ pub trait EscapeTimeFractal: BaseFractal {
 
     //Access Samples Storage
     fn samples_ref(self: &Self) -> Option::<&[usize]>;//Returns None if update() wasn't called since the last change to arguments/since construction
-
-    //Update Samples
-    fn update_samples(self: &mut Self);
 }
 
 pub trait RandomFractal: BaseFractal {
@@ -234,7 +234,54 @@ pub trait OldFractal {//Fractals that provide iteration counts only
 
 /* Associated Functions and Methods */
 
-//TODO
+/*impl FractalBox {
+    fn as_base_mut(self: &mut Self) -> &mut dyn BaseFractal {
+        match self {
+            FractalBox::IFS(IFSFractalBox) => { return IFSFractalBox.as_mut(); },
+            FractalBox::StrangeAttractor(StrangeAttractorFractalBox) => { return StrangeAttractorFractalBox.as_mut(); },
+            /*FractalBox::IFS(IFSFractalBox) => { return IFSFractalBox.get_max_threads(); },
+            FractalBox::IFS(IFSFractalBox) => { return IFSFractalBox.get_max_threads(); },
+            FractalBox::IFS(IFSFractalBox) => { return IFSFractalBox.get_max_threads(); },*/
+        }
+    }
+
+}
+*/
+
+impl BaseFractal for FractalBox {
+    //Getters
+    fn get_max_threads(self: &Self) -> usize {
+        match self {
+            FractalBox::IFS(ifs_fractal_box) => { return ifs_fractal_box.get_max_threads(); },
+            FractalBox::StrangeAttractor(strange_attractor_box) => { return strange_attractor_box.get_max_threads(); },
+            FractalBox::EscapeTime(escape_time_fractal_box) => { return escape_time_fractal_box.get_max_threads(); },
+            FractalBox::Random(random_fractal_box) => { return random_fractal_box.get_max_threads(); },
+            FractalBox::FiniteSubdivision(finite_subdivision_fractal_box) => { return finite_subdivision_fractal_box.get_max_threads(); },
+        }
+    }
+
+    //Setters
+    fn set_max_threads(self: &mut Self, max_threads: usize) {
+        match self {
+            FractalBox::IFS(ifs_fractal_box) => { return ifs_fractal_box.set_max_threads(max_threads); },
+            FractalBox::StrangeAttractor(strange_attractor_box) => { return strange_attractor_box.set_max_threads(max_threads); },
+            FractalBox::EscapeTime(escape_time_fractal_box) => { return escape_time_fractal_box.set_max_threads(max_threads); },
+            FractalBox::Random(random_fractal_box) => { return random_fractal_box.set_max_threads(max_threads); },
+            FractalBox::FiniteSubdivision(finite_subdivision_fractal_box) => { return finite_subdivision_fractal_box.set_max_threads(max_threads); },
+        }
+    }
+
+    //Update Samples
+    fn update(self: &mut Self) {
+        match self {
+            FractalBox::IFS(ifs_fractal_box) => { return ifs_fractal_box.update(); },
+            FractalBox::StrangeAttractor(strange_attractor_box) => { return strange_attractor_box.update(); },
+            FractalBox::EscapeTime(escape_time_fractal_box) => { return escape_time_fractal_box.update(); },
+            FractalBox::Random(random_fractal_box) => { return random_fractal_box.update(); },
+            FractalBox::FiniteSubdivision(finite_subdivision_fractal_box) => { return finite_subdivision_fractal_box.update(); },
+        }
+    }
+}
 
 /* Functions */
 

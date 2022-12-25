@@ -1,4 +1,4 @@
-
+use jfe::BaseFractal;
 
 fn main() {
     /*eprintln!("Creating new Mandelbrot");
@@ -23,4 +23,6 @@ fn main() {
     let fractal_box = jfe::ini::section_to_fractal(&(value.unwrap()[0].1));
 
     println!("{:?}", fractal_box);
+
+    fractal_box.unwrap().update();
 }
