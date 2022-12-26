@@ -106,9 +106,10 @@ impl Mandelbrot {
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
         let diverge_threshold_squared_f = x86_64::_mm256_set1_pd(diverge_threshold * diverge_threshold);
         let two_f = x86_64::_mm256_set1_pd(2.0);
-        let one_i_as_f = x86_64::_mm256_castsi256_pd(x86_64::_mm256_set1_epi64x(1));
 
         let mut result_i = x86_64::_mm256_set1_epi64x(0);
+
+        let mut incrementor_i_as_f = x86_64::_mm256_castsi256_pd(x86_64::_mm256_set1_epi64x(1));//We increment the result counter until we go past the diverge_threshold, then we never do again
 
         let mut z_real_f = x86_64::_mm256_set1_pd(0.0);
         let mut z_imag_f = x86_64::_mm256_set1_pd(0.0);
@@ -134,7 +135,7 @@ impl Mandelbrot {
             z_real_f = temp_z_real_f;
 
             //Increment the corresponding count only if we haven't converged yet
-            let incrementor_i_as_f = x86_64::_mm256_and_pd(compare_i_as_f, one_i_as_f);
+            incrementor_i_as_f = x86_64::_mm256_and_pd(compare_i_as_f, incrementor_i_as_f);
             let incrementor_i = x86_64::_mm256_castpd_si256(incrementor_i_as_f);//If a number hasn't converged, we will increment it's count
             //Since we don't have AVX2, we must add the top and bottom separately
             let lower_result_i = x86_64::_mm256_castsi256_si128(result_i);
@@ -169,7 +170,7 @@ impl Mandelbrot {
 
         let mut c_real = x86_64::_mm256_set_pd(self.min_real + (real_step_amount * 3.0), self.min_real + (real_step_amount * 2.0), self.min_real + real_step_amount, self.min_real);
         for x in (0..self.x_samples).step_by(4) {
-            let mut c_imag = x86_64::_mm256_set_pd(self.min_imag + (imag_step_amount * 3.0), self.min_imag + (imag_step_amount * 2.0), self.min_imag + imag_step_amount, self.min_imag);
+            let mut c_imag = x86_64::_mm256_set1_pd(self.min_imag);
             for y in 0..self.y_samples {
                 let result = self.mandelbrot_iterations_avx(c_real, c_imag);
                 let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut x86_64::__m256i;
@@ -191,9 +192,10 @@ impl Mandelbrot {
 
         let diverge_threshold_squared_f = x86_64::_mm_set_pd1(diverge_threshold * diverge_threshold);
         let two_f = x86_64::_mm_set_pd1(2.0);
-        let one_i = x86_64::_mm_set1_epi64x(1);
 
         let mut result_i = x86_64::_mm_set1_epi64x(0);
+
+        let mut incrementor_i = x86_64::_mm_set1_epi64x(1);//We increment the result counter until we go past the diverge_threshold, then we never do again
 
         let mut z_real_f = x86_64::_mm_set_pd1(0.0);
         let mut z_imag_f = x86_64::_mm_set_pd1(0.0);
@@ -219,7 +221,7 @@ impl Mandelbrot {
             z_real_f = temp_z_real_f;
 
             //Increment the corresponding count only if we haven't converged yet
-            let incrementor_i = x86_64::_mm_and_si128(compare_i, one_i);//If a number hasn't converged, we will increment it's count
+            incrementor_i = x86_64::_mm_and_si128(compare_i, incrementor_i);//If a number diverged, never increment it's iteration count again
             result_i = x86_64::_mm_add_epi64(result_i, incrementor_i);
         }
 
@@ -245,7 +247,7 @@ impl Mandelbrot {
 
         let mut c_real = x86_64::_mm_set_pd(self.min_real + real_step_amount, self.min_real);
         for x in (0..self.x_samples).step_by(2) {
-            let mut c_imag = x86_64::_mm_set_pd(self.min_imag + imag_step_amount, self.min_imag);
+            let mut c_imag = x86_64::_mm_set1_pd(self.min_imag);
             for y in 0..self.y_samples {
                 let result = self.mandelbrot_iterations_sse2(c_real, c_imag);
                 let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut x86_64::__m128i;
@@ -275,6 +277,7 @@ impl Mandelbrot {
                 self.update_sse2();//On x86_64, we can assume SSE2
             }
         }
+        //self.update_sse2();//TESTING
     }
 
     fn update_universal(self: &mut Self) {
