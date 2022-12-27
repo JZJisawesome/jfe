@@ -7,7 +7,7 @@
 
 /* Imports */
 
-mod amd64;
+pub(super) mod amd64;
 
 /* Constants */
 

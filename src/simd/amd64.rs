@@ -23,20 +23,24 @@ use core::arch::x86_64;
 
 /* Types */
 
-pub(super) struct Nice128I {
-    pub(super) vector: x86_64::__m128i
+#[derive(Copy, Clone, Debug)]
+pub struct Nice128I {
+    pub vector: x86_64::__m128i
 }
 
-pub(super) struct Nice128D {
-    pub(super) vector: x86_64::__m128d
+#[derive(Copy, Clone, Debug)]
+pub struct Nice128D {
+    pub vector: x86_64::__m128d
 }
 
-pub(super) struct Nice256I {
-    pub(super) vector: x86_64::__m256i
+#[derive(Copy, Clone, Debug)]
+pub struct Nice256I {
+    pub vector: x86_64::__m256i
 }
 
-pub(super) struct Nice256D {
-    pub(super) vector: x86_64::__m256d
+#[derive(Copy, Clone, Debug)]
+pub struct Nice256D {
+    pub vector: x86_64::__m256d
 }
 
 /*
@@ -65,7 +69,7 @@ pub(super) struct Double256D {
 
 impl Nice128I {
     #[inline(always)]
-    fn with_u64s_all_set_to(value: u64) -> Nice128I {
+    pub fn with_u64s_all_set_to(value: u64) -> Nice128I {
         unsafe {
             return Nice128I {
                 vector: x86_64::_mm_set1_epi64x(value as i64)
@@ -74,7 +78,7 @@ impl Nice128I {
     }
 
     #[inline(always)]
-    fn to_nice128d(self: Self) -> Nice128D {
+    pub fn to_nice128d(self: Self) -> Nice128D {
         unsafe {
             return Nice128D {
                 vector: x86_64::_mm_castsi128_pd(self.vector)
@@ -83,9 +87,16 @@ impl Nice128I {
     }
 
     #[inline(always)]
-    fn store_u64s_unaligned_to(self: &Self, addr: *mut u64) {
+    pub fn store_u64s_unaligned_to(self: &Self, addr: *mut u64) {
         unsafe {
             x86_64::_mm_storeu_si128(addr as *mut x86_64::__m128i, self.vector);
+        }
+    }
+
+    #[inline(always)]
+    pub fn create_mask_from_msbs_of_u8s(self: Self) -> i32 {
+        unsafe {
+            return x86_64::_mm_movemask_epi8(self.vector);
         }
     }
 
@@ -139,24 +150,33 @@ impl std::ops::BitAndAssign for Nice128I {
 
 impl Nice128D {
     #[inline(always)]
-    fn with_f64s(value_hi: f64, value_low: f64) -> Nice128D {
+    pub fn with_f64s(value_hi: f64, value_low: f64) -> Nice128D {
         return Nice128D {
             vector: unsafe { x86_64::_mm_set_pd(value_hi, value_low) }
         }
     }
 
     #[inline(always)]
-    fn with_f64s_all_set_to(value: f64) -> Nice128D {
+    pub fn with_f64s_all_set_to(value: f64) -> Nice128D {
         return Nice128D {
             vector: unsafe { x86_64::_mm_set_pd1(value) }
         }
     }
 
     #[inline(always)]
-    fn to_nice128i(self: Self) -> Nice128I {
+    pub fn to_nice128i(self: Self) -> Nice128I {
         unsafe {
             return Nice128I {
                 vector: x86_64::_mm_castpd_si128(self.vector)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn set_u64s_in_nice128i_if_less_than(self: Self, rhs: Nice128D) -> Nice128I {
+        unsafe {
+            return Nice128I {
+                vector: x86_64::_mm_castpd_si128(x86_64::_mm_cmplt_pd(self.vector, rhs.vector))
             }
         }
     }
