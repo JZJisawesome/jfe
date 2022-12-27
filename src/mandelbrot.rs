@@ -7,6 +7,9 @@
 
 /* Imports */
 
+mod universal;
+mod amd64;
+
 use std::ops::IndexMut;
 
 use crate::BaseFractal;
@@ -26,7 +29,7 @@ use crate::EscapeTimeFractal;
 
 /* Types */
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mandelbrot {
     max_iterations: usize,
     x_samples: usize,
@@ -50,7 +53,6 @@ impl Mandelbrot {
         min_real: f64, max_real: f64,
         min_imag: f64, max_imag: f64
     ) -> Mandelbrot {
-        assert!(max_iterations > 0, "Must at least iterate once");
         assert!(x_samples != 0, "x_samples must be non-zero");
         assert!(y_samples != 0, "y_samples must be non-zero");
 
@@ -70,31 +72,6 @@ impl Mandelbrot {
             iterations: new_iterations_vec,
             update_pending: true
         };
-    }
-
-    fn mandelbrot_iterations(self: &Self, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
-        //println!("mandelbrot iteration with params: {} {}", c_real, c_imag);
-        let diverge_threshold: f64 = 2.0;//TODO make this flexible?
-
-        //z_0 = 0
-        let mut z_real: f64 = 0.0;
-        let mut z_imag: f64 = 0.0;
-
-        //We exit the loop in two cases: if we reach MAX_ITERATIONS (meaning we assume the c value produces a bounded series)
-        //or the modulus of the complex number exceeds the diverge_threshold (meaning the c value produces an unbounded series)
-        let mut i: usize = 0;
-        while (i < self.max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (diverge_threshold * diverge_threshold)) {
-            //println!("iteration {} starts: z_real {}, z_imag {}", i, z_real, z_imag);
-            //z_(n+1) = z_n^2 + c
-            let next_z_real = (z_real * z_real) - (z_imag * z_imag) + c_real;
-            let next_z_imag = (2.0 * z_real * z_imag) + c_imag;
-            z_real = next_z_real;
-            z_imag = next_z_imag;
-            //println!("iteration {} ends: z_real {}, z_imag {}", i, z_real, z_imag);
-            i += 1;
-        }
-        //println!("mandelbrot ends returning {}", i);
-        return i;
     }
 
     #[inline(always)]
@@ -118,21 +95,11 @@ impl BaseFractal for Mandelbrot {
 
     //Update Samples
     fn update(self: &mut Self) {
-        let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);
-        let imag_length: f64 = self.max_imag - self.min_imag;
-        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
-
-        let mut c_real: f64 = self.min_real;
-        for x in 0..self.x_samples {
-            let mut c_imag: f64 = self.min_imag;
-            for y in 0..self.y_samples {
-                *self.at(x, y) = self.mandelbrot_iterations(c_real, c_imag);
-                c_imag += imag_step_amount;
-            }
-            c_real += real_step_amount;
+        if cfg!(target_arch = "x86_64") {
+            unsafe { self.update_x86_64(); }
+        } else {
+            self.update_universal();
         }
-        self.update_pending = false;
     }
 }
 
@@ -169,7 +136,6 @@ impl EscapeTimeFractal for Mandelbrot {
     //Setters
     //TODO only set update_pending if it changed
     fn set_max_iterations(self: &mut Self, max_iterations: usize) {
-        assert!(max_iterations > 0, "Must at least iterate once");
         self.max_iterations = max_iterations;
         self.update_pending = true;
     }

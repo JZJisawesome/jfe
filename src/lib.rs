@@ -5,12 +5,20 @@
  *
 */
 
+/* Nightly Features */
+
+//Only enabled if the relevant Cargo feature is
+#![cfg_attr(feature = "nightly-features-benches", feature(test))]
+
 /* Imports */
 
 pub mod mandelbrot;
 pub mod burning_ship;
 //mod numerical_traits;
 pub mod ini;
+
+mod simd;
+
 //pub mod fractal_names;
 use std::fmt::Debug;
 
