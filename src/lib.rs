@@ -15,6 +15,9 @@
 pub mod mandelbrot;
 //mod numerical_traits;
 pub mod ini;
+
+mod simd;
+
 //pub mod fractal_names;
 use std::fmt::Debug;
 

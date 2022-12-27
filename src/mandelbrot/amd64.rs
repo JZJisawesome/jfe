@@ -27,6 +27,8 @@ use core::arch::x86_64;
 
 //TODO
 
+//TODO add types to wrap multiple x86 vectors in one to make things more clear
+
 /* Associated Functions and Methods */
 
 impl Mandelbrot {
