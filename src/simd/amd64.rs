@@ -43,6 +43,7 @@ pub struct Nice256D {
     pub vector: x86_64::__m256d
 }
 
+/*
 #[derive(Copy, Clone, Debug)]
 pub struct Multi128I<const N: usize> {
     pub vectors: [x86_64::__m128i; N]
@@ -52,6 +53,7 @@ pub struct Multi128I<const N: usize> {
 pub struct Multi128D<const N: usize> {
     pub vectors: [x86_64::__m128d; N]
 }
+*/
 
 /*
 pub(super) struct Double128I {
@@ -83,6 +85,15 @@ impl Nice128I {
         unsafe {
             return Nice128I {
                 vector: x86_64::_mm_set1_epi64x(value as i64)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn new_zeroed() -> Nice128I {
+        unsafe {
+            return Nice128I {
+                vector: x86_64::_mm_setzero_si128()
             }
         }
     }
@@ -167,6 +178,15 @@ impl Nice128D {
     }
 
     #[inline(always)]
+    pub fn new_zeroed() -> Nice128D {
+        unsafe {
+            return Nice128D {
+                vector: x86_64::_mm_setzero_pd()
+            }
+        }
+    }
+
+    #[inline(always)]
     pub fn with_f64s_all_set_to(value: f64) -> Nice128D {
         return Nice128D {
             vector: unsafe { x86_64::_mm_set_pd1(value) }
@@ -246,13 +266,22 @@ impl std::ops::Add for Double128I {
     }
 }
 */
-
+/*
 impl<const N: usize> Multi128I<N> {
     #[inline(always)]
     pub fn with_u64s_all_set_to(value: u64) -> Multi128I<N> {
         unsafe {
             return Multi128I {
                 vectors: [x86_64::_mm_set1_epi64x(value as i64); N]
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn new_zeroed() -> Multi128I<N> {
+        unsafe {
+            return Multi128I {
+                vectors: [x86_64::_mm_setzero_si128(); N]
             }
         }
     }
@@ -310,50 +339,80 @@ impl<const N: usize> std::ops::Add for Multi128I<N> {
     }
 }
 
-/*
-impl std::ops::AddAssign for Nice128I {
-    #[inline(always)]
-    fn add_assign(self: &mut Self, rhs: Nice128I) {
-        unsafe {
-            self.vector = x86_64::_mm_add_epi64(self.vector, rhs.vector);
-        }
-    }
-}
 
-impl std::ops::BitAnd for Nice128I {
-    type Output = Nice128I;
-
+impl<const N: usize> std::ops::AddAssign for Multi128I<N> {
     #[inline(always)]
-    fn bitand(self: Self, rhs: Nice128I) -> Nice128I {
+    fn add_assign(self: &mut Self, rhs: Multi128I<N>) {
         unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_and_si128(self.vector, rhs.vector)
+            //TODO ensure the performance of this is okay
+            for i in 0..N {
+                self.vectors[i] = x86_64::_mm_add_epi64(self.vectors[i], rhs.vectors[i]);
             }
         }
     }
 }
 
-impl std::ops::BitAndAssign for Nice128I {
+impl<const N: usize> std::ops::BitAnd for Multi128I<N> {
+    type Output = Multi128I<N>;
+
     #[inline(always)]
-    fn bitand_assign(self: &mut Self, rhs: Nice128I) {
+    fn bitand(self: Self, rhs: Multi128I<N>) -> Multi128I<N> {
         unsafe {
-            self.vector = x86_64::_mm_and_si128(self.vector, rhs.vector);
+            //TODO ensure the performance of this is okay
+            let mut new_vectors: [x86_64::__m128i; N] = self.vectors;//TODO avoid cost of initializing this
+            for i in 0..N {
+                new_vectors[i] = x86_64::_mm_and_si128(self.vectors[i], rhs.vectors[i]);
+            }
+
+            return Multi128I::<N> {
+                vectors: new_vectors
+            }
         }
     }
 }
 
-impl Nice128D {
+impl<const N: usize> std::ops::BitAndAssign for Multi128I<N> {
     #[inline(always)]
-    pub fn with_f64s(value_hi: f64, value_low: f64) -> Nice128D {
-        return Nice128D {
-            vector: unsafe { x86_64::_mm_set_pd(value_hi, value_low) }
+    fn bitand_assign(self: &mut Self, rhs: Multi128I<N>) {
+        unsafe {
+            //TODO ensure the performance of this is okay
+            for i in 0..N {
+                self.vectors[i] = x86_64::_mm_and_si128(self.vectors[i], rhs.vectors[i]);
+            }
+        }
+    }
+}
+
+impl<const N: usize> Multi128D<N> {
+    /*#[inline(always)]
+    pub fn with_f64s(values_high: [f64; N], values_low: [f64; N]) -> Multi128D<N> {//Since we can't do [f64; N * 2]
+        unsafe {
+            //TODO ensure the performance of this is okay
+            let mut new_vectors: [x86_64::__m128d; N] = [];//TODO avoid cost of initializing this
+            for i in 0..N {
+                new_vectors[i] = x86_64::_mm_add_epi64(self.vectors[i], rhs.vectors[i]);
+            }
+            //return Multi128D {
+            //   vector: unsafe { x86_64::_mm_set_pd(value_hi, value_low) }
+            //}
+        }
+    }*/
+
+    #[inline(always)]
+    pub fn with_f64s_all_set_to(value: f64) -> Multi128D<N> {
+        unsafe {
+            return Multi128D::<N> {
+                vectors: [x86_64::_mm_set_pd1(value); N]
+            }
         }
     }
 
     #[inline(always)]
-    pub fn with_f64s_all_set_to(value: f64) -> Nice128D {
-        return Nice128D {
-            vector: unsafe { x86_64::_mm_set_pd1(value) }
+    pub fn new_zeroed() -> Multi128D<N> {
+        unsafe {
+            return Multi128D::<N> {
+                vectors: [x86_64::_mm_setzero_pd(); N]
+            }
         }
     }
 
@@ -365,7 +424,7 @@ impl Nice128D {
             }
         }
     }
-
+/*
     #[inline(always)]
     pub fn set_u64s_in_nice128i_if_less_than(self: Self, rhs: Nice128D) -> Nice128I {
         unsafe {
@@ -374,8 +433,11 @@ impl Nice128D {
             }
         }
     }
+    */
 }
+*/
 
+/*
 impl std::ops::Add for Nice128D {
     type Output = Nice128D;
 

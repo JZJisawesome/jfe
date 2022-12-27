@@ -541,12 +541,12 @@ impl Mandelbrot {
         let diverge_threshold_squared_f = Nice128D::with_f64s_all_set_to(diverge_threshold * diverge_threshold);
         let two_f = Nice128D::with_f64s_all_set_to(2.0);
 
-        let mut result_i = [Nice128I::with_u64s_all_set_to(0); 2];
+        let mut result_i = [Nice128I::new_zeroed(); 2];
 
         let mut incrementor_i = [Nice128I::with_u64s_all_set_to(1); 2];//We increment the result counter until we go past the diverge_threshold, then we never do again
 
-        let mut z_real_f = [Nice128D::with_f64s_all_set_to(0.0); 2];
-        let mut z_imag_f = [Nice128D::with_f64s_all_set_to(0.0); 2];
+        let mut z_real_f = [Nice128D::new_zeroed(); 2];
+        let mut z_imag_f = [Nice128D::new_zeroed(); 2];
 
         for _ in 0..self.max_iterations {
             //Calculate some values that are used below
