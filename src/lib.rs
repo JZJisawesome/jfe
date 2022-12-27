@@ -8,6 +8,7 @@
 /* Imports */
 
 pub mod mandelbrot;
+pub mod burning_ship;
 //mod numerical_traits;
 pub mod ini;
 //pub mod fractal_names;

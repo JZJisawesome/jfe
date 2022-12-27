@@ -77,7 +77,16 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
                         1,
                         1,
                         0.0, 0.0,
+                        0.0, 0.0
+                    ));
+                },
+                "burning_ship" => {
+                    escape_time_fractal_box = Box::new(crate::burning_ship::BurningShip::new(
+                        1,
+                        1,
+                        1,
                         0.0, 0.0,
+                        0.0, 0.0
                     ));
                 }
                 _ => { return Err(()); },
