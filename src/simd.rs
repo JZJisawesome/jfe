@@ -8,12 +8,12 @@
 /* Imports */
 
 
-pub(super) mod amd64;
+pub(super) mod old_amd64;
 //pub(super) mod new_amd64;
 
 
 #[cfg(target_arch = "x86_64")]
-pub(super) mod new_new_new_new_new_amd64;
+pub(super) mod amd64;
 
 /* Constants */
 

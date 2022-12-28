@@ -8,6 +8,9 @@
 /* Imports */
 
 use core::arch::x86_64;
+use std::fmt::Debug;
+use std::ops::*;
+use std::mem::MaybeUninit;
 
 /* Constants */
 
@@ -15,659 +18,461 @@ use core::arch::x86_64;
 
 /* Macros */
 
-//TODO (also pub(crate) use the_macro statements here too)
+macro_rules! overload_operator_for {
+    ($t: ident, $ops_trait: ident, $trait_function: ident, $amd64_intrinsic: ident) => {
+        impl $ops_trait for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn $trait_function(self: Self, rhs: Self) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::$amd64_intrinsic(self.vector, rhs.vector) }
+                };
+            }
+        }
+    }
+}
+
+macro_rules! overload_autoassignment_operator_for {
+    ($t: ident, $ops_trait: ident, $trait_function: ident, $amd64_intrinsic: ident) => {
+        impl $ops_trait for $t {
+            #[inline(always)]
+            fn $trait_function(self: &mut Self, rhs: Self) {
+                self.vector = unsafe { x86_64::$amd64_intrinsic(self.vector, rhs.vector) };
+            }
+        }
+    }
+}
+
+macro_rules! implement_nicetransmute_for {
+    ($t: ident, $amd64_intrinsic_t: ident) => {
+        impl From<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn from(raw: x86_64::$amd64_intrinsic_t) -> $t {
+                return $t {
+                    vector: raw
+                };
+            }
+        }
+
+        impl Into<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn into(self: Self) -> x86_64::$amd64_intrinsic_t {
+                return self.vector;
+            }
+        }
+
+        impl AsRef<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn as_ref(self: &Self) -> &x86_64::$amd64_intrinsic_t {
+                return &self.vector;
+            }
+        }
+
+        impl AsMut<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn as_mut(self: &mut Self) -> &mut x86_64::$amd64_intrinsic_t {
+                return &mut self.vector;
+            }
+        }
+    }
+}
+
+macro_rules! implement_cast_from_for {
+    ($t: ident, $amd64_intrinsic_t: ident, $amd64_intrinsic: ident) => {
+        impl From<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn from(raw: x86_64::$amd64_intrinsic_t) -> $t {
+                return $t {
+                    vector: unsafe { x86_64::$amd64_intrinsic(raw) }
+                };
+            }
+        }
+    }
+}
+
+macro_rules! implement_cast_into_for {
+    ($t: ident, $amd64_intrinsic_t: ident, $amd64_intrinsic: ident) => {
+        impl Into<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn into(self: Self) -> x86_64::$amd64_intrinsic_t {
+                return unsafe { x86_64::$amd64_intrinsic(self.vector) };
+            }
+        }
+    }
+}
+
+macro_rules! define_integer_vector128_struct_with_primitive {
+    ($t: ident, $primitive: ident) => (
+        //Basic setup of the new struct
+        #[derive(Copy, Clone, Debug)]
+        #[repr(align(16))]
+        pub struct $t {
+            vector: x86_64::__m128i
+        }
+
+        impl IntegerVector128 for $t {}
+
+        implement_cast_from_for!($t, __m128, _mm_castps_si128);
+        implement_cast_from_for!($t, __m128d, _mm_castpd_si128);
+        implement_cast_into_for!($t, __m128, _mm_castsi128_ps);
+        implement_cast_into_for!($t, __m128d, _mm_castsi128_pd);
+        implement_nicetransmute_for!($t, __m128i);
+
+        overload_operator_for!($t, BitAnd, bitand, _mm_and_si128);
+        overload_autoassignment_operator_for!($t, BitAndAssign, bitand_assign, _mm_and_si128);
+        overload_operator_for!($t, BitOr, bitor, _mm_or_si128);
+        overload_autoassignment_operator_for!($t, BitOrAssign, bitor_assign, _mm_or_si128);
+        overload_operator_for!($t, BitXor, bitxor, _mm_xor_si128);
+        overload_autoassignment_operator_for!($t, BitXorAssign, bitxor_assign, _mm_xor_si128);
+    )
+}
 
 /* Static Variables */
 
 //TODO
 
+/* Traits */
+
+pub trait Vector128:
+    Copy + Clone + Debug +
+    From<x86_64::__m128> + From<x86_64::__m128i> + From<x86_64::__m128d> + Into<x86_64::__m128> + Into<x86_64::__m128i> + Into<x86_64::__m128d> +
+    Add + AddAssign + BitAnd + BitAndAssign + BitOr + BitOrAssign + BitXor + BitXorAssign + Sub + SubAssign
+{
+    type AssociatedPrimitive;
+    type AssociatedPrimitiveArray;
+
+    fn new_from_array(array: Self::AssociatedPrimitiveArray) -> Self;
+    fn new_broadcasted(scalar: Self::AssociatedPrimitive) -> Self;
+    fn new_zeroed() -> Self;
+    fn new_uninit() -> MaybeUninit<Self>;
+
+    unsafe fn unaligned_load_from(self: Self, address: *const Self::AssociatedPrimitive);
+    unsafe fn unaligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive);
+    unsafe fn aligned_load_from(self: Self, address: *const Self::AssociatedPrimitive);
+    unsafe fn aligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive);
+
+    ////FIXME don't do this; movemask dosn't work on all primitive types (only U8, F32, F64)
+
+    //fn cmpeq(self: Self, rhs: Self) -> Self;
+    //TODO others like the above
+}
+
+pub trait FloatVector128:
+    Vector128 + Div + DivAssign + Mul + MulAssign
+{
+    //TODO
+    //TODO sqrt, rsqrt, etc.
+    fn movemask(self: Self) -> i32;
+
+}
+
+pub trait IntegerVector128: Vector128 + AsRef<x86_64::__m128i> + AsMut<x86_64::__m128i> {}//Marker trait
+
+//TODO on the I* vectors, Shr will be arithmetic, but it will be logical on the U* vectors
+pub trait ShiftableIntegerVector128: IntegerVector128 + Shl + ShlAssign + Shr + ShrAssign {
+    //TODO
+
+    //TODO perhaps have I8, I16, I32, I64 so that we do arithmetic shifts on that, and regular shifs on the U versions?
+    //fn shri<const AMOUNT: i32>(self: Self) -> Self;
+    //fn shli<const AMOUNT: i32>(self: Self) -> Self;
+}
+
 /* Types */
 
 #[derive(Copy, Clone, Debug)]
-pub struct Nice128I {
-    pub vector: x86_64::__m128i
+#[repr(align(16))]
+pub struct F32Vector128 {//TODO implement this (low priority)//TODO this will be Vector128 + AsRef<x86_64::__m128> + AsMut<x86_64::__m128>
+    vector: x86_64::__m128
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Nice128D {
-    pub vector: x86_64::__m128d
+#[repr(align(16))]
+pub struct F64Vector128 {//TODO this will be Vector128 + AsRef<x86_64::__m128d> + AsMut<x86_64::__m128d>
+    vector: x86_64::__m128d
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Nice256I {
-    pub vector: x86_64::__m256i
-}
+//TODO will still need to implement add, subtract, multiply, divide, shl, shr, etc. for each of these
+/*define_integer_vector128_struct_with_primitive!(I8Vector128, i8);//TODO this also supports fn movemask(self: Self) -> i32;
+define_integer_vector128_struct_with_primitive!(I16Vector128, i16);
+define_integer_vector128_struct_with_primitive!(I32Vector128, i32);
+define_integer_vector128_struct_with_primitive!(I64Vector128, i64);*/
 
-#[derive(Copy, Clone, Debug)]
-pub struct Nice256D {
-    pub vector: x86_64::__m256d
-}
-
+define_integer_vector128_struct_with_primitive!(U8Vector128, u8);
 /*
-#[derive(Copy, Clone, Debug)]
-pub struct Multi128I<const N: usize> {
-    pub vectors: [x86_64::__m128i; N]
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Multi128D<const N: usize> {
-    pub vectors: [x86_64::__m128d; N]
-}
-*/
-
-/*
-pub(super) struct Double128I {
-    pub(super) first: x86_64::__m128i,
-    pub(super) second: x86_64::__m128i
-}
-
-pub(super) struct Double128D {
-    pub(super) first: x86_64::__m128d,
-    pub(super) second: x86_64::__m128d
-}
-
-pub(super) struct Double256I {
-    pub(super) first: x86_64::__m256i,
-    pub(super) second: x86_64::__m256i
-}
-
-pub(super) struct Double256D {
-    pub(super) first: x86_64::__m256d,
-    pub(super) second: x86_64::__m256d
-}
-*/
+define_integer_vector128_struct_with_primitive!(U16Vector128, u16);
+define_integer_vector128_struct_with_primitive!(U32Vector128, u32);*/
+define_integer_vector128_struct_with_primitive!(U64Vector128, u64);
 
 /* Associated Functions and Methods */
 
-impl Nice128I {
-    #[inline(always)]
-    pub fn with_u64s_all_set_to(value: u64) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_set1_epi64x(value as i64)
-            }
-        }
-    }
+//F32Vector128
+//TODO
 
-    #[inline(always)]
-    pub fn new_zeroed() -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_setzero_si128()
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn to_nice128d(self: Self) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_castsi128_pd(self.vector)
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn store_u64s_unaligned_to(self: &Self, addr: *mut u64) {
-        unsafe {
-            x86_64::_mm_storeu_si128(addr as *mut x86_64::__m128i, self.vector);
-        }
-    }
-
-    #[inline(always)]
-    pub fn create_mask_from_msbs_of_u8s(self: Self) -> i32 {
-        unsafe {
-            return x86_64::_mm_movemask_epi8(self.vector);
-        }
-    }
-
-    //#[inline(always)]
-    //fn is_zero_sse2(self: &Self) ->
+//F64Vector128
+impl F64Vector128 {
+    //TODO
 }
 
-impl std::ops::Add for Nice128I {
-    type Output = Nice128I;
+impl Vector128 for F64Vector128 {
+    type AssociatedPrimitive = f64;
+    type AssociatedPrimitiveArray = [f64; 2];
 
     #[inline(always)]
-    fn add(self: Self, rhs: Nice128I) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_add_epi64(self.vector, rhs.vector)
-            }
-        }
+    fn new_from_array(array: [f64; 2]) -> Self {
+        return Self {
+            vector: unsafe { x86_64::_mm_set_pd(array[1], array[0]) }
+        };
     }
+
+    #[inline(always)]
+    fn new_broadcasted(scalar: f64) -> Self {
+        return Self {
+            vector: unsafe { x86_64::_mm_set1_pd(scalar) }
+        };
+    }
+
+    #[inline(always)]
+    fn new_zeroed() -> F64Vector128 {
+        return Self {
+            vector: unsafe { x86_64::_mm_setzero_pd() }
+        };
+    }
+
+    #[inline(always)]
+    fn new_uninit() -> MaybeUninit<F64Vector128> {
+        return MaybeUninit::new(F64Vector128 {
+            vector: unsafe { x86_64::_mm_undefined_pd() }
+        });
+    }
+
+    #[inline(always)]
+    unsafe fn unaligned_load_from(self: Self, address: *const f64) {
+        todo!()
+    }
+
+    #[inline(always)]
+    unsafe fn unaligned_store_to(self: Self, address: *mut f64) {
+        todo!()
+    }
+
+    #[inline(always)]
+    unsafe fn aligned_load_from(self: Self, address: *const f64) {
+        todo!()
+    }
+
+    #[inline(always)]
+    unsafe fn aligned_store_to(self: Self, address: *mut f64) {
+        todo!()
+    }
+
+
+    //TODO
 }
 
-impl std::ops::AddAssign for Nice128I {
+impl FloatVector128 for F64Vector128 {
     #[inline(always)]
-    fn add_assign(self: &mut Self, rhs: Nice128I) {
-        unsafe {
-            self.vector = x86_64::_mm_add_epi64(self.vector, rhs.vector);
-        }
+    fn movemask(self: Self) -> i32 {
+        todo!();
     }
+
+    //TODO
 }
 
-impl std::ops::BitAnd for Nice128I {
-    type Output = Nice128I;
+implement_cast_from_for!(F64Vector128, __m128, _mm_castps_pd);
+implement_cast_from_for!(F64Vector128, __m128i, _mm_castsi128_pd);
+implement_cast_into_for!(F64Vector128, __m128, _mm_castpd_ps);
+implement_cast_into_for!(F64Vector128, __m128i, _mm_castpd_si128);
+implement_nicetransmute_for!(F64Vector128, __m128d);
 
-    #[inline(always)]
-    fn bitand(self: Self, rhs: Nice128I) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_and_si128(self.vector, rhs.vector)
-            }
-        }
-    }
-}
+overload_operator_for!(F64Vector128, Add, add, _mm_add_pd);
+overload_autoassignment_operator_for!(F64Vector128, AddAssign, add_assign, _mm_add_pd);
+overload_operator_for!(F64Vector128, BitAnd, bitand, _mm_and_pd);
+overload_autoassignment_operator_for!(F64Vector128, BitAndAssign, bitand_assign, _mm_and_pd);
+overload_operator_for!(F64Vector128, BitOr, bitor, _mm_or_pd);
+overload_autoassignment_operator_for!(F64Vector128, BitOrAssign, bitor_assign, _mm_or_pd);
+overload_operator_for!(F64Vector128, BitXor, bitxor, _mm_xor_pd);
+overload_autoassignment_operator_for!(F64Vector128, BitXorAssign, bitxor_assign, _mm_xor_pd);
+overload_operator_for!(F64Vector128, Div, div, _mm_div_pd);
+overload_autoassignment_operator_for!(F64Vector128, DivAssign, div_assign, _mm_div_pd);
+overload_operator_for!(F64Vector128, Mul, mul, _mm_mul_pd);
+overload_autoassignment_operator_for!(F64Vector128, MulAssign, mul_assign, _mm_mul_pd);
+overload_operator_for!(F64Vector128, Sub, sub, _mm_div_pd);
+overload_autoassignment_operator_for!(F64Vector128, SubAssign, sub_assign, _mm_sub_pd);
 
-impl std::ops::BitAndAssign for Nice128I {
-    #[inline(always)]
-    fn bitand_assign(self: &mut Self, rhs: Nice128I) {
-        unsafe {
-            self.vector = x86_64::_mm_and_si128(self.vector, rhs.vector);
-        }
-    }
-}
-
-impl Nice128D {
-    #[inline(always)]
-    pub fn with_f64s(value_hi: f64, value_low: f64) -> Nice128D {
-        return Nice128D {
-            vector: unsafe { x86_64::_mm_set_pd(value_hi, value_low) }
-        }
-    }
-
-    #[inline(always)]
-    pub fn new_zeroed() -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_setzero_pd()
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn with_f64s_all_set_to(value: f64) -> Nice128D {
-        return Nice128D {
-            vector: unsafe { x86_64::_mm_set_pd1(value) }
-        }
-    }
-
-    #[inline(always)]
-    pub fn to_nice128i(self: Self) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_castpd_si128(self.vector)
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn set_u64s_in_nice128i_if_less_than(self: Self, rhs: Nice128D) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_castpd_si128(x86_64::_mm_cmplt_pd(self.vector, rhs.vector))
-            }
-        }
-    }
-}
-
-impl std::ops::Add for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_add_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::Sub for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn sub(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_sub_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::Mul for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn mul(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_mul_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl Nice256I {
-    #[inline(always)]
-    pub fn with_u64s_all_set_to(value: u64) -> Nice256I {
-        unsafe {
-            return Nice256I {
-                vector: x86_64::_mm256_set1_epi64x(value as i64)
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn new_zeroed() -> Nice256I {
-        unsafe {
-            return Nice256I {
-                vector: x86_64::_mm256_setzero_si256()
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn to_nice256d(self: Self) -> Nice256D {
-        unsafe {
-            return Nice256D {
-                vector: x86_64::_mm256_castsi256_pd(self.vector)
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn store_u64s_unaligned_to(self: &Self, addr: *mut u64) {
-        unsafe {
-            x86_64::_mm256_storeu_si256(addr as *mut x86_64::__m256i, self.vector);
-        }
-    }
-
-    /*#[inline(always)]
-    pub fn create_mask_from_msbs_of_u8s(self: Self) -> i32 {
-        unsafe {
-            return x86_64::_mm256_movemask_pd(self.vector);
-        }
-    }
-    */
-
-    //TODO use addition functions to make it clear if AVX2 is used or not
-
-    pub fn add_u64s_without_avx2(lhs: Nice256I, rhs: Nice256I) -> Nice256I {
-        unsafe {
-            //We have to add the upper and lower parts separately
-
-            //Split them apart
-            let lower_lhs = x86_64::_mm256_castsi256_si128(lhs.vector);
-            let upper_lhs = x86_64::_mm256_extractf128_si256(lhs.vector, 1);
-            let lower_rhs = x86_64::_mm256_castsi256_si128(rhs.vector);
-            let upper_rhs = x86_64::_mm256_extractf128_si256(rhs.vector, 1);
-
-            //Add the halves
-            let lower_sum = x86_64::_mm_add_epi64(lower_lhs, lower_rhs);
-            let upper_sum = x86_64::_mm_add_epi64(upper_lhs, upper_rhs);
-
-            //Put them back together
-            let mut result = x86_64::_mm256_castsi128_si256(lower_sum);
-            result = x86_64::_mm256_insertf128_si256(result, upper_sum, 1);
-
-            return Nice256I {
-                vector: result
-            }
-        }
-    }
-
-    pub fn add_u64s_with_avx2(lhs: Nice256I, rhs: Nice256I) -> Nice256I {
-        unsafe {
-            return Nice256I {
-                vector: x86_64::_mm256_add_epi64(lhs.vector, rhs.vector)
-            }
-        }
-    }
-
-    //#[inline(always)]
-    //fn is_zero_sse2(self: &Self) ->
-}
+//I8Vector128
+//TODO
 /*
-
-impl std::ops::BitAnd for Nice128I {
-    type Output = Nice128I;
-
+impl I8Vector128 {
     #[inline(always)]
-    fn bitand(self: Self, rhs: Nice128I) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_and_si128(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::BitAndAssign for Nice128I {
-    #[inline(always)]
-    fn bitand_assign(self: &mut Self, rhs: Nice128I) {
-        unsafe {
-            self.vector = x86_64::_mm_and_si128(self.vector, rhs.vector);
-        }
-    }
-}
-
-impl Nice128D {
-    #[inline(always)]
-    pub fn with_f64s(value_hi: f64, value_low: f64) -> Nice128D {
-        return Nice128D {
-            vector: unsafe { x86_64::_mm_set_pd(value_hi, value_low) }
-        }
-    }
-
-    #[inline(always)]
-    pub fn new_zeroed() -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_setzero_pd()
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn with_f64s_all_set_to(value: f64) -> Nice128D {
-        return Nice128D {
-            vector: unsafe { x86_64::_mm_set_pd1(value) }
-        }
-    }
-
-    #[inline(always)]
-    pub fn to_nice128i(self: Self) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_castpd_si128(self.vector)
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn set_u64s_in_nice128i_if_less_than(self: Self, rhs: Nice128D) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_castpd_si128(x86_64::_mm_cmplt_pd(self.vector, rhs.vector))
-            }
-        }
-    }
-}
-
-impl std::ops::Add for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_add_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::Sub for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn sub(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_sub_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::Mul for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn mul(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_mul_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-*/
-
-
-
-
-/*
-impl std::ops::Add for Double128I {
-    type Output = Double128I;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: Double128I) -> Double128I {
-        unsafe {
-            return Double128I {
-                first: x86_64::_mm_add_epi64(self.first, rhs.first),
-                second: x86_64::_mm_add_epi64(self.second, rhs.second)
-            }
-        }
+    fn movemask(self: Self) -> i32 {
+        return unsafe { x86_64::_mm_movemask_epi8(self.vector) };
     }
 }
 */
-/*
-impl<const N: usize> Multi128I<N> {
+
+//I16Vector128
+//TODO
+
+//I32Vector128
+//TODO
+
+//I64Vector128
+//TODO
+
+//U8Vector128
+impl U8Vector128 {
     #[inline(always)]
-    pub fn with_u64s_all_set_to(value: u64) -> Multi128I<N> {
-        unsafe {
-            return Multi128I {
-                vectors: [x86_64::_mm_set1_epi64x(value as i64); N]
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn new_zeroed() -> Multi128I<N> {
-        unsafe {
-            return Multi128I {
-                vectors: [x86_64::_mm_setzero_si128(); N]
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn to_128d(self: Self) -> Multi128D<N> {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            return Multi128D::<N> {
-                vectors: self.vectors.map(| v | x86_64::_mm_castsi128_pd(v))
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn store_u64s_unaligned_to(self: &Self, addr: *mut u64) {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            let pointer = addr as *mut x86_64::__m128i;
-            for offset in 0..N {
-                x86_64::_mm_storeu_si128(pointer.offset(offset as isize), self.vectors[offset]);
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn create_mask_from_msbs_of_u8s(self: Self) -> [i32; N] {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            return self.vectors.map(| v | x86_64::_mm_movemask_epi8(v));
-        }
-    }
-
-    //#[inline(always)]
-    //fn is_zero_sse2(self: &Self) ->
-}
-
-
-impl<const N: usize> std::ops::Add for Multi128I<N> {
-    type Output = Multi128I<N>;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: Multi128I<N>) -> Multi128I<N> {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            let mut new_vectors: [x86_64::__m128i; N] = self.vectors;//TODO avoid cost of initializing this
-            for i in 0..N {
-                new_vectors[i] = x86_64::_mm_add_epi64(self.vectors[i], rhs.vectors[i]);
-            }
-
-            return Multi128I::<N> {
-                vectors: new_vectors
-            }
-        }
+    fn movemask(self: Self) -> i32 {
+        return unsafe { x86_64::_mm_movemask_epi8(self.vector) };
     }
 }
 
+impl Vector128 for U8Vector128 {
+    //TODO turn boilerplate into a macro (everything that's common between all IntegerVector128 types)
 
-impl<const N: usize> std::ops::AddAssign for Multi128I<N> {
+
+    type AssociatedPrimitive = u8;
+    type AssociatedPrimitiveArray = [u8; 16];
+
     #[inline(always)]
-    fn add_assign(self: &mut Self, rhs: Multi128I<N>) {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            for i in 0..N {
-                self.vectors[i] = x86_64::_mm_add_epi64(self.vectors[i], rhs.vectors[i]);
+    fn new_from_array(array: [u8; 16]) -> Self {
+        return Self {
+            vector: unsafe {
+                x86_64::_mm_set_epi8(
+                    array[15] as i8, array[14] as i8, array[13] as i8, array[12] as i8,
+                    array[11] as i8, array[10] as i8, array[9] as i8, array[8] as i8,
+                    array[7] as i8, array[6] as i8, array[5] as i8, array[4] as i8,
+                    array[3] as i8, array[2] as i8, array[1] as i8, array[0] as i8
+                )
             }
+        };
+    }
+
+    #[inline(always)]
+    fn new_broadcasted(scalar: u8) -> U8Vector128 {
+        return U8Vector128 {
+            vector: unsafe { x86_64::_mm_set1_epi8(scalar as i8) }
         }
     }
+
+    #[inline(always)]//TODO boilerplate
+    fn new_zeroed() -> U8Vector128 {
+        return U8Vector128 {
+            vector: unsafe { x86_64::_mm_setzero_si128() }
+        };
+    }
+
+    #[inline(always)]//TODO boilerplate
+    fn new_uninit() -> MaybeUninit<U8Vector128> {
+        return MaybeUninit::new(U8Vector128 {
+            vector: unsafe { x86_64::_mm_undefined_si128() }
+        });
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn unaligned_load_from(self: Self, address: *const u8) {
+        todo!()
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn unaligned_store_to(self: Self, address: *mut u8) {
+        unsafe { x86_64::_mm_storeu_si128(address as *mut x86_64::__m128i, self.vector); }
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn aligned_load_from(self: Self, address: *const u8) {
+        todo!()
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn aligned_store_to(self: Self, address: *mut u8) {
+        unsafe { x86_64::_mm_store_si128(address as *mut x86_64::__m128i, self.vector); }
+    }
+
+    //TODO
 }
 
-impl<const N: usize> std::ops::BitAnd for Multi128I<N> {
-    type Output = Multi128I<N>;
+overload_operator_for!(U8Vector128, Add, add, _mm_add_epi8);
+overload_autoassignment_operator_for!(U8Vector128, AddAssign, add_assign, _mm_add_epi8);
+overload_operator_for!(U8Vector128, Sub, sub, _mm_sub_epi8);
+overload_autoassignment_operator_for!(U8Vector128, SubAssign, sub_assign, _mm_sub_epi8);
+
+//U16Vector128
+//TODO
+
+//U32Vector128
+//TODO
+
+//U64Vector128
+impl Vector128 for U64Vector128 {
+    //TODO turn boilerplate into a macro (everything that's common between all IntegerVector128 types)
+
+
+    type AssociatedPrimitive = u64;
+    type AssociatedPrimitiveArray = [u64; 2];
 
     #[inline(always)]
-    fn bitand(self: Self, rhs: Multi128I<N>) -> Multi128I<N> {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            let mut new_vectors: [x86_64::__m128i; N] = self.vectors;//TODO avoid cost of initializing this
-            for i in 0..N {
-                new_vectors[i] = x86_64::_mm_and_si128(self.vectors[i], rhs.vectors[i]);
-            }
+    fn new_from_array(array: [u64; 2]) -> Self {
+        return Self {
+            vector: unsafe { x86_64::_mm_set_epi64x(array[1] as i64, array[0] as i64) }
+        };
+    }
 
-            return Multi128I::<N> {
-                vectors: new_vectors
-            }
+    #[inline(always)]
+    fn new_broadcasted(scalar: u64) -> U64Vector128 {
+        return U64Vector128 {
+            vector: unsafe { x86_64::_mm_set1_epi64x(scalar as i64) }
         }
     }
+
+    #[inline(always)]//TODO boilerplate
+    fn new_zeroed() -> U64Vector128 {
+        return U64Vector128 {
+            vector: unsafe { x86_64::_mm_setzero_si128() }
+        };
+    }
+
+    #[inline(always)]//TODO boilerplate
+    fn new_uninit() -> MaybeUninit<U64Vector128> {
+        return MaybeUninit::new(U64Vector128 {
+            vector: unsafe { x86_64::_mm_undefined_si128() }
+        });
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn unaligned_load_from(self: Self, address: *const u64) {
+        todo!()
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn unaligned_store_to(self: Self, address: *mut u64) {
+        unsafe { x86_64::_mm_storeu_si128(address as *mut x86_64::__m128i, self.vector); }
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn aligned_load_from(self: Self, address: *const u64) {
+        todo!()
+    }
+
+    #[inline(always)]//TODO boilerplate
+    unsafe fn aligned_store_to(self: Self, address: *mut u64) {
+        unsafe { x86_64::_mm_store_si128(address as *mut x86_64::__m128i, self.vector); }
+    }
+
+    //TODO
 }
 
-impl<const N: usize> std::ops::BitAndAssign for Multi128I<N> {
-    #[inline(always)]
-    fn bitand_assign(self: &mut Self, rhs: Multi128I<N>) {
-        unsafe {
-            //TODO ensure the performance of this is okay
-            for i in 0..N {
-                self.vectors[i] = x86_64::_mm_and_si128(self.vectors[i], rhs.vectors[i]);
-            }
-        }
-    }
-}
+impl ShiftableIntegerVector128 for U64Vector128 {}
 
-impl<const N: usize> Multi128D<N> {
-    /*#[inline(always)]
-    pub fn with_f64s(values_high: [f64; N], values_low: [f64; N]) -> Multi128D<N> {//Since we can't do [f64; N * 2]
-        unsafe {
-            //TODO ensure the performance of this is okay
-            let mut new_vectors: [x86_64::__m128d; N] = [];//TODO avoid cost of initializing this
-            for i in 0..N {
-                new_vectors[i] = x86_64::_mm_add_epi64(self.vectors[i], rhs.vectors[i]);
-            }
-            //return Multi128D {
-            //   vector: unsafe { x86_64::_mm_set_pd(value_hi, value_low) }
-            //}
-        }
-    }*/
-
-    #[inline(always)]
-    pub fn with_f64s_all_set_to(value: f64) -> Multi128D<N> {
-        unsafe {
-            return Multi128D::<N> {
-                vectors: [x86_64::_mm_set_pd1(value); N]
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn new_zeroed() -> Multi128D<N> {
-        unsafe {
-            return Multi128D::<N> {
-                vectors: [x86_64::_mm_setzero_pd(); N]
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn to_nice128i(self: Self) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_castpd_si128(self.vector)
-            }
-        }
-    }
-/*
-    #[inline(always)]
-    pub fn set_u64s_in_nice128i_if_less_than(self: Self, rhs: Nice128D) -> Nice128I {
-        unsafe {
-            return Nice128I {
-                vector: x86_64::_mm_castpd_si128(x86_64::_mm_cmplt_pd(self.vector, rhs.vector))
-            }
-        }
-    }
-    */
-}
-*/
-
-/*
-impl std::ops::Add for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_add_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::Sub for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn sub(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_sub_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-
-impl std::ops::Mul for Nice128D {
-    type Output = Nice128D;
-
-    #[inline(always)]
-    fn mul(self: Self, rhs: Nice128D) -> Nice128D {
-        unsafe {
-            return Nice128D {
-                vector: x86_64::_mm_mul_pd(self.vector, rhs.vector)
-            }
-        }
-    }
-}
-*/
+overload_operator_for!(U64Vector128, Add, add, _mm_add_epi64);
+overload_autoassignment_operator_for!(U64Vector128, AddAssign, add_assign, _mm_add_epi64);
+overload_operator_for!(U64Vector128, Sub, sub, _mm_sub_epi64);
+overload_autoassignment_operator_for!(U64Vector128, SubAssign, sub_assign, _mm_sub_epi64);
+overload_operator_for!(U64Vector128, Shl, shl, _mm_sll_epi64);
+overload_autoassignment_operator_for!(U64Vector128, ShlAssign, shl_assign, _mm_sll_epi64);
+overload_operator_for!(U64Vector128, Shr, shr, _mm_srl_epi64);//Logical right shift since this is unsigned
+overload_autoassignment_operator_for!(U64Vector128, ShrAssign, shr_assign, _mm_srl_epi64);//Logical right shift since this is unsigned
 
 /* Functions */
 
