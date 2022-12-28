@@ -44,6 +44,64 @@ macro_rules! overload_autoassignment_operator_for {
     }
 }
 
+macro_rules! implement_nicetransmute_for {
+    ($t: ident, $amd64_intrinsic_t: ident) => {
+        impl From<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn from(raw: x86_64::$amd64_intrinsic_t) -> $t {
+                return $t {
+                    vector: raw
+                };
+            }
+        }
+
+        impl Into<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn into(self: Self) -> x86_64::$amd64_intrinsic_t {
+                return self.vector;
+            }
+        }
+
+        impl AsRef<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn as_ref(self: &Self) -> &x86_64::$amd64_intrinsic_t {
+                return &self.vector;
+            }
+        }
+
+        impl AsMut<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn as_mut(self: &mut Self) -> &mut x86_64::$amd64_intrinsic_t {
+                return &mut self.vector;
+            }
+        }
+    }
+}
+
+macro_rules! implement_cast_from_for {
+    ($t: ident, $amd64_intrinsic_t: ident, $amd64_intrinsic: ident) => {
+        impl From<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn from(raw: x86_64::$amd64_intrinsic_t) -> $t {
+                return $t {
+                    vector: unsafe { x86_64::$amd64_intrinsic(raw) }
+                };
+            }
+        }
+    }
+}
+
+macro_rules! implement_cast_into_for {
+    ($t: ident, $amd64_intrinsic_t: ident, $amd64_intrinsic: ident) => {
+        impl Into<x86_64::$amd64_intrinsic_t> for $t {
+            #[inline(always)]
+            fn into(self: Self) -> x86_64::$amd64_intrinsic_t {
+                return unsafe { x86_64::$amd64_intrinsic(self.vector) };
+            }
+        }
+    }
+}
+
 macro_rules! define_integer_vector128_struct_with_primitive {
     ($t: ident, $primitive: ident) => (
         //Basic setup of the new struct
@@ -73,67 +131,11 @@ macro_rules! define_integer_vector128_struct_with_primitive {
         }
 
         //Conversion functions
-        impl From<x86_64::__m128> for $t {
-            #[inline(always)]
-            fn from(raw: x86_64::__m128) -> $t {
-                return $t {
-                    vector: unsafe { x86_64::_mm_castps_si128(raw) }
-                };
-            }
-        }
-
-        impl From<x86_64::__m128i> for $t {
-            #[inline(always)]
-            fn from(raw: x86_64::__m128i) -> $t {
-                return $t {
-                    vector: raw
-                };
-            }
-        }
-
-        impl From<x86_64::__m128d> for $t {
-            #[inline(always)]
-            fn from(raw: x86_64::__m128d) -> $t {
-                return $t {
-                    vector: unsafe { x86_64::_mm_castpd_si128(raw) }
-                };
-            }
-        }
-
-        impl Into<x86_64::__m128> for $t {
-            #[inline(always)]
-            fn into(self: Self) -> x86_64::__m128 {
-                return unsafe { x86_64::_mm_castsi128_ps(self.vector) };
-            }
-        }
-
-        impl Into<x86_64::__m128i> for $t {
-            #[inline(always)]
-            fn into(self: Self) -> x86_64::__m128i {
-                return self.vector;
-            }
-        }
-
-        impl Into<x86_64::__m128d> for $t {
-            #[inline(always)]
-            fn into(self: Self) -> x86_64::__m128d {
-                return unsafe { x86_64::_mm_castsi128_pd(self.vector) };
-            }
-        }
-
-        impl AsRef<x86_64::__m128i> for $t {
-            #[inline(always)]
-            fn as_ref(self: &Self) -> &x86_64::__m128i {
-                return &self.vector;
-            }
-        }
-
-        impl AsMut<x86_64::__m128i> for $t {
-            #[inline(always)]
-            fn as_mut(self: &mut Self) -> &mut x86_64::__m128i {
-                return &mut self.vector;
-            }
-        }
+        implement_cast_from_for!($t, __m128, _mm_castps_si128);
+        implement_cast_from_for!($t, __m128d, _mm_castpd_si128);
+        implement_cast_into_for!($t, __m128, _mm_castsi128_ps);
+        implement_cast_into_for!($t, __m128d, _mm_castsi128_pd);
+        implement_nicetransmute_for!($t, __m128i);
 
         //Operator overloading
         overload_operator_for!($t, BitAnd, bitand, _mm_and_si128);
@@ -294,67 +296,11 @@ impl FloatVector128 for F64Vector128 {
     //TODO
 }
 
-impl From<x86_64::__m128> for F64Vector128 {
-    #[inline(always)]
-    fn from(raw: x86_64::__m128) -> F64Vector128 {
-        return F64Vector128 {
-            vector: unsafe { x86_64::_mm_castps_pd(raw) }
-        };
-    }
-}
-
-impl From<x86_64::__m128i> for F64Vector128 {
-    #[inline(always)]
-    fn from(raw: x86_64::__m128i) -> F64Vector128 {
-        return F64Vector128 {
-            vector: unsafe { x86_64::_mm_castsi128_pd(raw) }
-        };
-    }
-}
-
-impl From<x86_64::__m128d> for F64Vector128 {
-    #[inline(always)]
-    fn from(raw: x86_64::__m128d) -> F64Vector128 {
-        return F64Vector128 {
-            vector: raw
-        };
-    }
-}
-
-impl Into<x86_64::__m128> for F64Vector128 {
-    #[inline(always)]
-    fn into(self: Self) -> x86_64::__m128 {
-        return unsafe { x86_64::_mm_castpd_ps(self.vector) };
-    }
-}
-
-impl Into<x86_64::__m128i> for F64Vector128 {
-    #[inline(always)]
-    fn into(self: Self) -> x86_64::__m128i {
-        return unsafe { x86_64::_mm_castpd_si128(self.vector) };
-    }
-}
-
-impl Into<x86_64::__m128d> for F64Vector128 {
-    #[inline(always)]
-    fn into(self: Self) -> x86_64::__m128d {
-        return self.vector;
-    }
-}
-
-impl AsRef<x86_64::__m128d> for F64Vector128 {
-    #[inline(always)]
-    fn as_ref(self: &Self) -> &x86_64::__m128d {
-        return &self.vector;
-    }
-}
-
-impl AsMut<x86_64::__m128d> for F64Vector128 {
-    #[inline(always)]
-    fn as_mut(self: &mut Self) -> &mut x86_64::__m128d {
-        return &mut self.vector;
-    }
-}
+implement_cast_from_for!(F64Vector128, __m128, _mm_castps_pd);
+implement_cast_from_for!(F64Vector128, __m128i, _mm_castsi128_pd);
+implement_cast_into_for!(F64Vector128, __m128, _mm_castpd_ps);
+implement_cast_into_for!(F64Vector128, __m128i, _mm_castpd_si128);
+implement_nicetransmute_for!(F64Vector128, __m128d);
 
 overload_operator_for!(F64Vector128, Add, add, _mm_add_pd);
 overload_autoassignment_operator_for!(F64Vector128, AddAssign, add_assign, _mm_add_pd);
