@@ -136,59 +136,12 @@ macro_rules! define_integer_vector128_struct_with_primitive {
         }
 
         //Operator overloading
-        impl BitAnd for $t {
-            type Output = Self;
-
-            #[inline(always)]
-            fn bitand(self: Self, rhs: Self) -> Self {
-                return Self {
-                    vector: unsafe { x86_64::_mm_and_si128(self.vector, rhs.vector) }
-                };
-            }
-        }
-
-        impl BitAndAssign for $t {
-            #[inline(always)]
-            fn bitand_assign(self: &mut Self, rhs: Self) {
-                self.vector = unsafe { x86_64::_mm_and_si128(self.vector, rhs.vector) };
-            }
-        }
-
-        impl BitOr for $t {
-            type Output = Self;
-
-            #[inline(always)]
-            fn bitor(self: Self, rhs: Self) -> Self {
-                return Self {
-                    vector: unsafe { x86_64::_mm_or_si128(self.vector, rhs.vector) }
-                };
-            }
-        }
-
-        impl BitOrAssign for $t {
-            #[inline(always)]
-            fn bitor_assign(self: &mut Self, rhs: Self) {
-                self.vector = unsafe { x86_64::_mm_or_si128(self.vector, rhs.vector) };
-            }
-        }
-
-        impl BitXor for $t {
-            type Output = Self;
-
-            #[inline(always)]
-            fn bitxor(self: Self, rhs: Self) -> Self {
-                return Self {
-                    vector: unsafe { x86_64::_mm_xor_si128(self.vector, rhs.vector) }
-                };
-            }
-        }
-
-        impl BitXorAssign for $t {
-            #[inline(always)]
-            fn bitxor_assign(self: &mut Self, rhs: Self) {
-                self.vector = unsafe { x86_64::_mm_xor_si128(self.vector, rhs.vector) };
-            }
-        }
+        overload_operator_for!($t, BitAnd, bitand, _mm_and_si128);
+        overload_autoassignment_operator_for!($t, BitAndAssign, bitand_assign, _mm_and_si128);
+        overload_operator_for!($t, BitOr, bitor, _mm_or_si128);
+        overload_autoassignment_operator_for!($t, BitOrAssign, bitor_assign, _mm_or_si128);
+        overload_operator_for!($t, BitXor, bitxor, _mm_xor_si128);
+        overload_autoassignment_operator_for!($t, BitXorAssign, bitxor_assign, _mm_xor_si128);
     )
 }
 
@@ -403,134 +356,20 @@ impl AsMut<x86_64::__m128d> for F64Vector128 {
     }
 }
 
-/*
-impl std::ops::Add for F64Vector128 {
-    type Output = F64Vector128;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: F64Vector128) -> F64Vector128 {
-        return F64Vector128 {
-            vector: unsafe { x86_64::_mm_add_pd(self.vector, rhs.vector) }
-        }
-    }
-}
-*/
 overload_operator_for!(F64Vector128, Add, add, _mm_add_pd);
-
-impl std::ops::AddAssign for F64Vector128 {
-    #[inline(always)]
-    fn add_assign(self: &mut Self, rhs: F64Vector128) {
-        self.vector = unsafe { x86_64::_mm_add_pd(self.vector, rhs.vector) };
-    }
-}
-
-impl BitAnd for F64Vector128 {
-    type Output = Self;
-
-    #[inline(always)]
-    fn bitand(self: Self, rhs: Self) -> Self {
-        return Self {
-            vector: unsafe { x86_64::_mm_and_pd(self.vector, rhs.vector) }
-        };
-    }
-}
-
-impl BitAndAssign for F64Vector128 {
-    #[inline(always)]
-    fn bitand_assign(self: &mut Self, rhs: Self) {
-        self.vector = unsafe { x86_64::_mm_and_pd(self.vector, rhs.vector) };
-    }
-}
-
-impl BitOr for F64Vector128 {
-    type Output = Self;
-
-    #[inline(always)]
-    fn bitor(self: Self, rhs: Self) -> Self {
-        return Self {
-            vector: unsafe { x86_64::_mm_or_pd(self.vector, rhs.vector) }
-        };
-    }
-}
-
-impl BitOrAssign for F64Vector128 {
-    #[inline(always)]
-    fn bitor_assign(self: &mut Self, rhs: Self) {
-        self.vector = unsafe { x86_64::_mm_or_pd(self.vector, rhs.vector) };
-    }
-}
-
-impl BitXor for F64Vector128 {
-    type Output = Self;
-
-    #[inline(always)]
-    fn bitxor(self: Self, rhs: Self) -> Self {
-        return Self {
-            vector: unsafe { x86_64::_mm_xor_pd(self.vector, rhs.vector) }
-        };
-    }
-}
-
-impl BitXorAssign for F64Vector128 {
-    #[inline(always)]
-    fn bitxor_assign(self: &mut Self, rhs: Self) {
-        self.vector = unsafe { x86_64::_mm_xor_pd(self.vector, rhs.vector) };
-    }
-}
-
-impl std::ops::Div for F64Vector128 {
-    type Output = F64Vector128;
-
-    #[inline(always)]
-    fn div(self: Self, rhs: F64Vector128) -> F64Vector128 {
-        return F64Vector128 {
-            vector: unsafe { x86_64::_mm_div_pd(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::DivAssign for F64Vector128 {
-    #[inline(always)]
-    fn div_assign(self: &mut Self, rhs: F64Vector128) {
-        self.vector = unsafe { x86_64::_mm_div_pd(self.vector, rhs.vector) };
-    }
-}
-
-impl std::ops::Mul for F64Vector128 {
-    type Output = F64Vector128;
-
-    #[inline(always)]
-    fn mul(self: Self, rhs: F64Vector128) -> F64Vector128 {
-        return F64Vector128 {
-            vector: unsafe { x86_64::_mm_mul_pd(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::MulAssign for F64Vector128 {
-    #[inline(always)]
-    fn mul_assign(self: &mut Self, rhs: F64Vector128) {
-        self.vector = unsafe { x86_64::_mm_mul_pd(self.vector, rhs.vector) };
-    }
-}
-
-impl std::ops::Sub for F64Vector128 {
-    type Output = F64Vector128;
-
-    #[inline(always)]
-    fn sub(self: Self, rhs: F64Vector128) -> F64Vector128 {
-        return F64Vector128 {
-            vector: unsafe { x86_64::_mm_sub_pd(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::SubAssign for F64Vector128 {
-    #[inline(always)]
-    fn sub_assign(self: &mut Self, rhs: F64Vector128) {
-        self.vector = unsafe { x86_64::_mm_sub_pd(self.vector, rhs.vector) };
-    }
-}
+overload_autoassignment_operator_for!(F64Vector128, AddAssign, add_assign, _mm_add_pd);
+overload_operator_for!(F64Vector128, BitAnd, bitand, _mm_and_pd);
+overload_autoassignment_operator_for!(F64Vector128, BitAndAssign, bitand_assign, _mm_and_pd);
+overload_operator_for!(F64Vector128, BitOr, bitor, _mm_or_pd);
+overload_autoassignment_operator_for!(F64Vector128, BitOrAssign, bitor_assign, _mm_or_pd);
+overload_operator_for!(F64Vector128, BitXor, bitxor, _mm_xor_pd);
+overload_autoassignment_operator_for!(F64Vector128, BitXorAssign, bitxor_assign, _mm_xor_pd);
+overload_operator_for!(F64Vector128, Div, div, _mm_div_pd);
+overload_autoassignment_operator_for!(F64Vector128, DivAssign, div_assign, _mm_div_pd);
+overload_operator_for!(F64Vector128, Mul, mul, _mm_mul_pd);
+overload_autoassignment_operator_for!(F64Vector128, MulAssign, mul_assign, _mm_mul_pd);
+overload_operator_for!(F64Vector128, Sub, sub, _mm_div_pd);
+overload_autoassignment_operator_for!(F64Vector128, SubAssign, sub_assign, _mm_sub_pd);
 
 //I8Vector128
 //TODO
@@ -628,77 +467,14 @@ impl Vector128 for U64Vector128 {
     //TODO
 }
 
-impl std::ops::Add for U64Vector128 {
-    type Output = U64Vector128;
-
-    #[inline(always)]
-    fn add(self: Self, rhs: U64Vector128) -> U64Vector128 {
-        return U64Vector128 {
-            vector: unsafe { x86_64::_mm_add_epi64(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::AddAssign for U64Vector128 {
-    #[inline(always)]
-    fn add_assign(self: &mut Self, rhs: U64Vector128) {
-        self.vector = unsafe { x86_64::_mm_add_epi64(self.vector, rhs.vector) };
-    }
-}
-
-impl std::ops::Sub for U64Vector128 {
-    type Output = U64Vector128;
-
-    #[inline(always)]
-    fn sub(self: Self, rhs: U64Vector128) -> U64Vector128 {
-        return U64Vector128 {
-            vector: unsafe { x86_64::_mm_sub_epi64(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::SubAssign for U64Vector128 {
-    #[inline(always)]
-    fn sub_assign(self: &mut Self, rhs: U64Vector128) {
-        self.vector = unsafe { x86_64::_mm_sub_epi64(self.vector, rhs.vector) };
-    }
-}
-
-impl std::ops::Shl for U64Vector128 {
-    type Output = U64Vector128;
-
-    #[inline(always)]
-    fn shl(self: Self, rhs: U64Vector128) -> U64Vector128 {
-        return U64Vector128 {
-            vector: unsafe { x86_64::_mm_sll_epi64(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::ShlAssign for U64Vector128 {
-    #[inline(always)]
-    fn shl_assign(self: &mut Self, rhs: U64Vector128) {
-        self.vector = unsafe { x86_64::_mm_sll_epi64(self.vector, rhs.vector) };
-    }
-}
-
-impl std::ops::Shr for U64Vector128 {//Logical right shift since this is unsigned
-    type Output = U64Vector128;
-
-    #[inline(always)]
-    fn shr(self: Self, rhs: U64Vector128) -> U64Vector128 {
-        return U64Vector128 {
-            vector: unsafe { x86_64::_mm_srl_epi64(self.vector, rhs.vector) }
-        }
-    }
-}
-
-impl std::ops::ShrAssign for U64Vector128 {//Logical right shift since this is unsigned
-    #[inline(always)]
-    fn shr_assign(self: &mut Self, rhs: U64Vector128) {
-        self.vector = unsafe { x86_64::_mm_srl_epi64(self.vector, rhs.vector) };
-    }
-}
+overload_operator_for!(U64Vector128, Add, add, _mm_add_epi64);
+overload_autoassignment_operator_for!(U64Vector128, AddAssign, add_assign, _mm_add_epi64);
+overload_operator_for!(U64Vector128, Sub, sub, _mm_sub_epi64);
+overload_autoassignment_operator_for!(U64Vector128, SubAssign, sub_assign, _mm_sub_epi64);
+overload_operator_for!(U64Vector128, Shl, shl, _mm_sll_epi64);
+overload_autoassignment_operator_for!(U64Vector128, ShlAssign, shl_assign, _mm_sll_epi64);
+overload_operator_for!(U64Vector128, Shr, shr, _mm_srl_epi64);//Logical right shift since this is unsigned
+overload_autoassignment_operator_for!(U64Vector128, ShrAssign, shr_assign, _mm_srl_epi64);//Logical right shift since this is unsigned
 
 /* Functions */
 
