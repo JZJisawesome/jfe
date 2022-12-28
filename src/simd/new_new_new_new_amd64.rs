@@ -121,9 +121,43 @@ macro_rules! define_vector128_struct_called {
         impl BitAndAssign for $t {
             #[inline(always)]
             fn bitand_assign(self: &mut Self, rhs: Self) {
-                unsafe {
-                    self.vector = unsafe { x86_64::_mm_and_si128(self.vector.into(), rhs.vector.into()) };
-                }
+                self.vector = unsafe { x86_64::_mm_and_si128(self.vector.into(), rhs.vector.into()) };
+            }
+        }
+
+        impl BitOr for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn bitor(self: Self, rhs: Self) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::_mm_or_si128(self.vector.into(), rhs.vector.into()) }
+                };
+            }
+        }
+
+        impl BitOrAssign for $t {
+            #[inline(always)]
+            fn bitor_assign(self: &mut Self, rhs: Self) {
+                self.vector = unsafe { x86_64::_mm_or_si128(self.vector.into(), rhs.vector.into()) };
+            }
+        }
+
+        impl BitXor for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn bitxor(self: Self, rhs: Self) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::_mm_xor_si128(self.vector.into(), rhs.vector.into()) }
+                };
+            }
+        }
+
+        impl BitXorAssign for $t {
+            #[inline(always)]
+            fn bitxor_assign(self: &mut Self, rhs: Self) {
+                self.vector = unsafe { x86_64::_mm_xor_si128(self.vector.into(), rhs.vector.into()) };
             }
         }
 
@@ -137,7 +171,7 @@ macro_rules! define_vector128_struct_called {
 
 /* Traits */
 
-pub trait Vector128: Copy + Clone + Debug + From<x86_64::__m128> + From<x86_64::__m128i> + From<x86_64::__m128d> + Into<x86_64::__m128> + Into<x86_64::__m128i> + Into<x86_64::__m128d> + BitAnd + BitAndAssign {//TODO add other universal traits
+pub trait Vector128: Copy + Clone + Debug + From<x86_64::__m128> + From<x86_64::__m128i> + From<x86_64::__m128d> + Into<x86_64::__m128> + Into<x86_64::__m128i> + Into<x86_64::__m128d> + BitAnd + BitAndAssign + BitOr + BitOrAssign + BitXor + BitXorAssign {//TODO add other universal traits
     #[inline(always)]
     fn new_zeroed() -> Self {
         return Self::from(unsafe { x86_64::_mm_setzero_si128() });
