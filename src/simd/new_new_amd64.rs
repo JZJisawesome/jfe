@@ -35,6 +35,8 @@ macro_rules! define_vector128_struct_called {
             vector: Raw128
         }
 
+        /* BackedByRaw128 implementations for conversion */
+
         impl BackedByRaw128 for $t {}
 
         impl From<Raw128> for $t {
@@ -70,6 +72,8 @@ macro_rules! define_vector128_struct_called {
         */
         //Workaround
         impl $t {
+            //TODO figure out how to make these public without exposing BackedByRaw128
+
             fn from_workaround(other: impl BackedByRaw128) -> Self {
                 return Self::from(other.into());//Convert to Raw128 and back
             }

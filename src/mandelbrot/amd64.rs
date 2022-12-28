@@ -16,6 +16,17 @@ use crate::simd::amd64::{Nice128I, Nice128D};
 
 use crate::simd::new_new_amd64::{Vector128, U64Vector128, F64Vector128};//TESTING
 
+/*
+fn test() {
+    let the_test1 = U64Vector128::from_workaround(F64Vector128::new_zeroed());
+    let the_test2 = F64Vector128::from_workaround(U64Vector128::new_zeroed());
+    let the_test3: F64Vector128 = U64Vector128::new_zeroed().into_workaround();
+    let the_test4: U64Vector128 = F64Vector128::new_zeroed().into_workaround();
+
+    //This works and avoids the workaround, but can't be used outside of this module...
+    //let the_test5 = U64Vector128::from(Into::<Raw128>::into(F64Vector128::new_zeroed()));
+}
+*/
 
 /* Constants */
 
