@@ -18,6 +18,32 @@ use std::mem::MaybeUninit;
 
 /* Macros */
 
+macro_rules! overload_operator_for {
+    ($t: ident, $ops_trait: ident, $trait_function: ident, $amd64_intrinsic: ident) => {
+        impl $ops_trait for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn $trait_function(self: Self, rhs: Self) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::$amd64_intrinsic(self.vector, rhs.vector) }
+                };
+            }
+        }
+    }
+}
+
+macro_rules! overload_autoassignment_operator_for {
+    ($t: ident, $ops_trait: ident, $trait_function: ident, $amd64_intrinsic: ident) => {
+        impl $ops_trait for $t {
+            #[inline(always)]
+            fn $trait_function(self: &mut Self, rhs: Self) {
+                self.vector = unsafe { x86_64::$amd64_intrinsic(self.vector, rhs.vector) };
+            }
+        }
+    }
+}
+
 macro_rules! define_integer_vector128_struct_with_primitive {
     ($t: ident, $primitive: ident) => (
         //Basic setup of the new struct
@@ -178,8 +204,9 @@ pub trait Vector128:
     Add + AddAssign + BitAnd + BitAndAssign + BitOr + BitOrAssign + BitXor + BitXorAssign + Sub + SubAssign
 {
     type AssociatedPrimitive;
+    type AssociatedPrimitiveArray;
 
-    //fn new_from_array(array: Self::AssociatedPrimitiveArray) -> Self;
+    fn new_from_array(array: Self::AssociatedPrimitiveArray) -> Self;
     fn new_broadcasted(scalar: Self::AssociatedPrimitive) -> Self;
     fn new_zeroed() -> Self;
     fn new_uninit() -> MaybeUninit<Self>;
@@ -188,6 +215,8 @@ pub trait Vector128:
     unsafe fn unaligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive);
     unsafe fn aligned_load_from(self: Self, address: *const Self::AssociatedPrimitive);
     unsafe fn aligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive);
+
+    ////FIXME don't do this; movemask dosn't work on all primitive types (only U8, F32, F64)
 
     //fn cmpeq(self: Self, rhs: Self) -> Self;
     //TODO others like the above
@@ -198,6 +227,8 @@ pub trait FloatVector128:
 {
     //TODO
     //TODO sqrt, rsqrt, etc.
+    fn movemask(self: Self) -> i32;
+
 }
 
 pub trait IntegerVector128://TODO on the I* vectors, Shr will be arithmetic, but it will be logical on the U* vectors
@@ -225,12 +256,12 @@ pub struct F64Vector128 {//TODO this will be Vector128 + AsRef<x86_64::__m128d> 
 }
 
 //TODO will still need to implement add, subtract, multiply, divide, shl, shr, etc. for each of these
-/*define_integer_vector128_struct_with_primitive!(I8Vector128, i8);
+/*define_integer_vector128_struct_with_primitive!(I8Vector128, i8);//TODO this also supports fn movemask(self: Self) -> i32;
 define_integer_vector128_struct_with_primitive!(I16Vector128, i16);
 define_integer_vector128_struct_with_primitive!(I32Vector128, i32);
 define_integer_vector128_struct_with_primitive!(I64Vector128, i64);*/
 
-/*define_integer_vector128_struct_with_primitive!(U8Vector128, u8);
+/*define_integer_vector128_struct_with_primitive!(U8Vector128, u8);//TODO this also supports fn movemask(self: Self) -> i32;
 define_integer_vector128_struct_with_primitive!(U16Vector128, u16);
 define_integer_vector128_struct_with_primitive!(U32Vector128, u32);*/
 define_integer_vector128_struct_with_primitive!(U64Vector128, u64);
@@ -241,8 +272,20 @@ define_integer_vector128_struct_with_primitive!(U64Vector128, u64);
 //TODO
 
 //F64Vector128
+impl F64Vector128 {
+    //TODO
+}
+
 impl Vector128 for F64Vector128 {
     type AssociatedPrimitive = f64;
+    type AssociatedPrimitiveArray = [f64; 2];
+
+    #[inline(always)]
+    fn new_from_array(array: [f64; 2]) -> Self {
+        return Self {
+            vector: unsafe { x86_64::_mm_set_pd(array[1], array[0]) }
+        };
+    }
 
     #[inline(always)]
     fn new_broadcasted(scalar: f64) -> Self {
@@ -290,6 +333,11 @@ impl Vector128 for F64Vector128 {
 }
 
 impl FloatVector128 for F64Vector128 {
+    #[inline(always)]
+    fn movemask(self: Self) -> i32 {
+        todo!();
+    }
+
     //TODO
 }
 
@@ -355,6 +403,7 @@ impl AsMut<x86_64::__m128d> for F64Vector128 {
     }
 }
 
+/*
 impl std::ops::Add for F64Vector128 {
     type Output = F64Vector128;
 
@@ -365,6 +414,8 @@ impl std::ops::Add for F64Vector128 {
         }
     }
 }
+*/
+overload_operator_for!(F64Vector128, Add, add, _mm_add_pd);
 
 impl std::ops::AddAssign for F64Vector128 {
     #[inline(always)]
@@ -483,6 +534,14 @@ impl std::ops::SubAssign for F64Vector128 {
 
 //I8Vector128
 //TODO
+/*
+impl I8Vector128 {
+    #[inline(always)]
+    fn movemask(self: Self) -> i32 {
+        return unsafe { x86_64::_mm_movemask_epi8(self.vector) };
+    }
+}
+*/
 
 //I16Vector128
 //TODO
@@ -495,6 +554,14 @@ impl std::ops::SubAssign for F64Vector128 {
 
 //U8Vector128
 //TODO
+/*
+impl U8Vector128 {
+    #[inline(always)]
+    fn movemask(self: Self) -> i32 {
+        return unsafe { x86_64::_mm_movemask_epi8(self.vector) };
+    }
+}
+*/
 
 //U16Vector128
 //TODO
@@ -504,8 +571,18 @@ impl std::ops::SubAssign for F64Vector128 {
 
 //U64Vector128
 impl Vector128 for U64Vector128 {
-    //TODO turn this boilerplate into a macro (everything that's common between all IntegerVector128 types)
+    //TODO turn boilerplate into a macro (everything that's common between all IntegerVector128 types)
+
+
     type AssociatedPrimitive = u64;
+    type AssociatedPrimitiveArray = [u64; 2];
+
+    #[inline(always)]
+    fn new_from_array(array: [u64; 2]) -> Self {
+        return Self {
+            vector: unsafe { x86_64::_mm_set_epi64x(array[1] as i64, array[0] as i64) }
+        };
+    }
 
     #[inline(always)]
     fn new_broadcasted(scalar: u64) -> U64Vector128 {
@@ -514,39 +591,41 @@ impl Vector128 for U64Vector128 {
         }
     }
 
-    #[inline(always)]
+    #[inline(always)]//TODO boilerplate
     fn new_zeroed() -> U64Vector128 {
         return U64Vector128 {
             vector: unsafe { x86_64::_mm_setzero_si128() }
         };
     }
 
-    #[inline(always)]
+    #[inline(always)]//TODO boilerplate
     fn new_uninit() -> MaybeUninit<U64Vector128> {
         return MaybeUninit::new(U64Vector128 {
             vector: unsafe { x86_64::_mm_undefined_si128() }
         });
     }
 
-    #[inline(always)]
+    #[inline(always)]//TODO boilerplate
     unsafe fn unaligned_load_from(self: Self, address: *const u64) {
         todo!()
     }
 
-    #[inline(always)]
+    #[inline(always)]//TODO boilerplate
     unsafe fn unaligned_store_to(self: Self, address: *mut u64) {
-        todo!()
+        unsafe { x86_64::_mm_storeu_si128(address as *mut x86_64::__m128i, self.vector); }
     }
 
-    #[inline(always)]
+    #[inline(always)]//TODO boilerplate
     unsafe fn aligned_load_from(self: Self, address: *const u64) {
         todo!()
     }
 
-    #[inline(always)]
+    #[inline(always)]//TODO boilerplate
     unsafe fn aligned_store_to(self: Self, address: *mut u64) {
-        todo!()
+        unsafe { x86_64::_mm_store_si128(address as *mut x86_64::__m128i, self.vector); }
     }
+
+    //TODO
 }
 
 impl std::ops::Add for U64Vector128 {
