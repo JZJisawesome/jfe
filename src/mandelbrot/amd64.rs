@@ -14,7 +14,7 @@ use core::arch::x86_64;
 use crate::simd::amd64::{Nice128I, Nice128D};
 
 
-use crate::simd::new_new_amd64::{Vector128, U64Vector128, F64Vector128};//TESTING
+//use crate::simd::new_new_new_amd64::{Vector128, U64Vector128, F64Vector128};//TESTING
 
 /*
 fn test() {
