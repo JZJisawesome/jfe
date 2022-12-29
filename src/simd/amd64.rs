@@ -19,7 +19,7 @@ use std::mem::MaybeUninit;
 /* Macros */
 
 macro_rules! overload_operator_for {
-    ($t: ident, $ops_trait: ident, $trait_function: ident, $amd64_intrinsic: ident) => {
+    ($t: ident, $ops_trait: ident, $trait_function: ident, $auto_ops_trait: ident, $auto_trait_function: ident, $amd64_intrinsic: ident) => {
         impl $ops_trait for $t {
             type Output = Self;
 
@@ -30,14 +30,10 @@ macro_rules! overload_operator_for {
                 };
             }
         }
-    }
-}
 
-macro_rules! overload_autoassignment_operator_for {
-    ($t: ident, $ops_trait: ident, $trait_function: ident, $amd64_intrinsic: ident) => {
-        impl $ops_trait for $t {
+        impl $auto_ops_trait for $t {
             #[inline(always)]
-            fn $trait_function(self: &mut Self, rhs: Self) {
+            fn $auto_trait_function(self: &mut Self, rhs: Self) {
                 self.vector = unsafe { x86_64::$amd64_intrinsic(self.vector, rhs.vector) };
             }
         }
@@ -119,12 +115,9 @@ macro_rules! define_integervector128_struct_with_primitive {
         implement_cast_into_for!($t, __m128d, _mm_castsi128_pd);
         implement_nicetransmute_for!($t, __m128i);
 
-        overload_operator_for!($t, BitAnd, bitand, _mm_and_si128);
-        overload_autoassignment_operator_for!($t, BitAndAssign, bitand_assign, _mm_and_si128);
-        overload_operator_for!($t, BitOr, bitor, _mm_or_si128);
-        overload_autoassignment_operator_for!($t, BitOrAssign, bitor_assign, _mm_or_si128);
-        overload_operator_for!($t, BitXor, bitxor, _mm_xor_si128);
-        overload_autoassignment_operator_for!($t, BitXorAssign, bitxor_assign, _mm_xor_si128);
+        overload_operator_for!($t, BitAnd, bitand, BitAndAssign, bitand_assign, _mm_and_si128);
+        overload_operator_for!($t, BitOr, bitor, BitOrAssign, bitor_assign, _mm_or_si128);
+        overload_operator_for!($t, BitXor, bitxor, BitXorAssign, bitxor_assign, _mm_xor_si128);
     }
 }
 
@@ -226,9 +219,18 @@ pub trait SSE41Comparable: IntegerVector128 + Shiftable {//Mutually exclusive wi
 
 pub trait SSE41CommonFloatFeatures: FloatVector128 {
     //TODO These are addsub, blend, blendv, ceil, dp, floor, hadd, hsub, round
+    //TODO some of these apply to integers too
 }
 
+pub trait SSE41ExtraF32Vector128Features: FloatVector128 {
+    //TODO These are
+}
 
+pub trait SSE41ExtraF64Vector128Features: FloatVector128 {
+    //TODO These are loaddup, movdup,
+}
+
+//TODO add AVX/AVX2/AVX512 feature traits for 128-bit vectors too
 
 /* Types */
 
@@ -337,20 +339,13 @@ implement_cast_into_for!(F64Vector128, __m128, _mm_castpd_ps);
 implement_cast_into_for!(F64Vector128, __m128i, _mm_castpd_si128);
 implement_nicetransmute_for!(F64Vector128, __m128d);
 
-overload_operator_for!(F64Vector128, Add, add, _mm_add_pd);
-overload_autoassignment_operator_for!(F64Vector128, AddAssign, add_assign, _mm_add_pd);
-overload_operator_for!(F64Vector128, BitAnd, bitand, _mm_and_pd);
-overload_autoassignment_operator_for!(F64Vector128, BitAndAssign, bitand_assign, _mm_and_pd);
-overload_operator_for!(F64Vector128, BitOr, bitor, _mm_or_pd);
-overload_autoassignment_operator_for!(F64Vector128, BitOrAssign, bitor_assign, _mm_or_pd);
-overload_operator_for!(F64Vector128, BitXor, bitxor, _mm_xor_pd);
-overload_autoassignment_operator_for!(F64Vector128, BitXorAssign, bitxor_assign, _mm_xor_pd);
-overload_operator_for!(F64Vector128, Div, div, _mm_div_pd);
-overload_autoassignment_operator_for!(F64Vector128, DivAssign, div_assign, _mm_div_pd);
-overload_operator_for!(F64Vector128, Mul, mul, _mm_mul_pd);
-overload_autoassignment_operator_for!(F64Vector128, MulAssign, mul_assign, _mm_mul_pd);
-overload_operator_for!(F64Vector128, Sub, sub, _mm_div_pd);
-overload_autoassignment_operator_for!(F64Vector128, SubAssign, sub_assign, _mm_sub_pd);
+overload_operator_for!(F64Vector128, Add, add, AddAssign, add_assign, _mm_add_pd);
+overload_operator_for!(F64Vector128, BitAnd, bitand, BitAndAssign, bitand_assign, _mm_and_pd);
+overload_operator_for!(F64Vector128, BitOr, bitor, BitOrAssign, bitor_assign, _mm_or_pd);
+overload_operator_for!(F64Vector128, BitXor, bitxor, BitXorAssign, bitxor_assign, _mm_xor_pd);
+overload_operator_for!(F64Vector128, Div, div, DivAssign, div_assign, _mm_div_pd);
+overload_operator_for!(F64Vector128, Mul, mul, MulAssign, mul_assign, _mm_mul_pd);
+overload_operator_for!(F64Vector128, Sub, sub, SubAssign, sub_assign, _mm_div_pd);
 
 //I8Vector128
 //TODO
@@ -410,10 +405,8 @@ impl Vector128 for U8Vector128 {
     //TODO
 }
 
-overload_operator_for!(U8Vector128, Add, add, _mm_add_epi8);
-overload_autoassignment_operator_for!(U8Vector128, AddAssign, add_assign, _mm_add_epi8);
-overload_operator_for!(U8Vector128, Sub, sub, _mm_sub_epi8);
-overload_autoassignment_operator_for!(U8Vector128, SubAssign, sub_assign, _mm_sub_epi8);
+overload_operator_for!(U8Vector128, Add, add, AddAssign, add_assign, _mm_add_epi8);
+overload_operator_for!(U8Vector128, Sub, sub, SubAssign, sub_assign, _mm_sub_epi8);
 
 //U16Vector128
 //TODO
@@ -449,14 +442,10 @@ impl Shiftable for U64Vector128 {
     //TODO
 }
 
-overload_operator_for!(U64Vector128, Add, add, _mm_add_epi64);
-overload_autoassignment_operator_for!(U64Vector128, AddAssign, add_assign, _mm_add_epi64);
-overload_operator_for!(U64Vector128, Sub, sub, _mm_sub_epi64);
-overload_autoassignment_operator_for!(U64Vector128, SubAssign, sub_assign, _mm_sub_epi64);
-overload_operator_for!(U64Vector128, Shl, shl, _mm_sll_epi64);
-overload_autoassignment_operator_for!(U64Vector128, ShlAssign, shl_assign, _mm_sll_epi64);
-overload_operator_for!(U64Vector128, Shr, shr, _mm_srl_epi64);//Logical right shift since this is unsigned
-overload_autoassignment_operator_for!(U64Vector128, ShrAssign, shr_assign, _mm_srl_epi64);//Logical right shift since this is unsigned
+overload_operator_for!(U64Vector128, Add, add, AddAssign, add_assign, _mm_add_epi64);
+overload_operator_for!(U64Vector128, Sub, sub, SubAssign, sub_assign, _mm_sub_epi64);
+overload_operator_for!(U64Vector128, Shl, shl, ShlAssign, shl_assign, _mm_sll_epi64);
+overload_operator_for!(U64Vector128, Shr, shr, ShrAssign, shr_assign, _mm_srl_epi64);//Logical right shift since this is unsigned
 
 /* Functions */
 
