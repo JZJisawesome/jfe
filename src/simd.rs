@@ -13,7 +13,7 @@ pub(super) mod old_amd64;
 
 
 #[cfg(target_arch = "x86_64")]
-pub(super) mod amd64;
+pub(super) mod amd64;//TODO perhaps bump up the requirement to SSE4.1 for universal comparison?
 
 /* Constants */
 
