@@ -115,9 +115,70 @@ macro_rules! define_integervector128_struct_with_primitive {
         implement_cast_into_for!($t, __m128d, _mm_castsi128_pd);
         implement_nicetransmute_for!($t, __m128i);
 
-        overload_operator_for!($t, BitAnd, bitand, BitAndAssign, bitand_assign, _mm_and_si128);
-        overload_operator_for!($t, BitOr, bitor, BitOrAssign, bitor_assign, _mm_or_si128);
-        overload_operator_for!($t, BitXor, bitxor, BitXorAssign, bitxor_assign, _mm_xor_si128);
+        impl<OtherT: FloatVector128> From<OtherT> for $t {
+            #[inline(always)]
+            fn from(other: OtherT) -> $t {
+                return $t {
+                    vector: other.into()
+                };
+            }
+        }
+
+        //TODO handle From other IntegerVector128 types
+
+        impl<OtherT: IntegerVector128> BitAnd<OtherT> for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn bitand(self: Self, rhs: OtherT) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::_mm_and_si128(self.vector, rhs.into()) }
+                };
+            }
+        }
+
+        impl<OtherT: IntegerVector128> BitAndAssign<OtherT> for $t {
+            #[inline(always)]
+            fn bitand_assign(self: &mut Self, rhs: OtherT) {
+                self.vector = unsafe { x86_64::_mm_and_si128(self.vector, rhs.into()) };
+            }
+        }
+
+        impl<OtherT: IntegerVector128> BitOr<OtherT> for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn bitor(self: Self, rhs: OtherT) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::_mm_or_si128(self.vector, rhs.into()) }
+                };
+            }
+        }
+
+        impl<OtherT: IntegerVector128> BitOrAssign<OtherT> for $t {
+            #[inline(always)]
+            fn bitor_assign(self: &mut Self, rhs: OtherT) {
+                self.vector = unsafe { x86_64::_mm_or_si128(self.vector, rhs.into()) };
+            }
+        }
+
+        impl<OtherT: IntegerVector128> BitXor<OtherT> for $t {
+            type Output = Self;
+
+            #[inline(always)]
+            fn bitxor(self: Self, rhs: OtherT) -> Self {
+                return Self {
+                    vector: unsafe { x86_64::_mm_xor_si128(self.vector, rhs.into()) }
+                };
+            }
+        }
+
+        impl<OtherT: IntegerVector128> BitXorAssign<OtherT> for $t {
+            #[inline(always)]
+            fn bitxor_assign(self: &mut Self, rhs: OtherT) {
+                self.vector = unsafe { x86_64::_mm_xor_si128(self.vector, rhs.into()) };
+            }
+        }
     }
 }
 
@@ -186,7 +247,7 @@ pub trait Vector128:
 }
 
 pub trait Comparable: Vector128 {//Mutually exclusive with SSE41Comparable
-    //fn cmpeq(self: Self, rhs: Self) -> Self;
+    fn cmplt(self: Self, rhs: Self) -> Self;
     //TODO others like the above
 }
 
@@ -246,6 +307,8 @@ pub struct F64Vector128 {//TODO this will be Vector128 + AsRef<x86_64::__m128d> 
     vector: x86_64::__m128d
 }
 
+//TODO figure out how to go From/Into between the IntegerVector types
+
 //TODO will still need to implement add, subtract, multiply, divide, shl, shr, etc. for each of these
 /*define_integer_vector128_struct_with_primitive!(I8Vector128, i8);//TODO this also supports fn movemask(self: Self) -> i32;
 define_integervector128_struct_with_primitive!(I16Vector128, i16);
@@ -275,7 +338,7 @@ impl Vector128 for F64Vector128 {
     #[inline(always)]
     fn new_from_array(array: [f64; 2]) -> Self {
         return Self {
-            vector: unsafe { x86_64::_mm_set_pd(array[1], array[0]) }
+            vector: unsafe { x86_64::_mm_set_pd(array[0], array[1]) }
         };
     }
 
@@ -333,6 +396,35 @@ impl FloatVector128 for F64Vector128 {
     //TODO
 }
 
+impl Comparable for F64Vector128 {
+    #[inline(always)]
+    fn cmplt(self: F64Vector128, rhs: F64Vector128) -> F64Vector128 {
+        return F64Vector128 {
+            vector: unsafe { x86_64::_mm_cmplt_pd(self.vector, rhs.vector) }
+        };
+    }
+}
+
+impl From<F32Vector128> for F64Vector128 {
+    #[inline(always)]
+    fn from(other: F32Vector128) -> F64Vector128 {
+        /*return F64Vector128 {
+            vector: other.into()
+        };
+        */
+        todo!();
+    }
+}
+
+impl<OtherT: IntegerVector128> From<OtherT> for F64Vector128 {
+    #[inline(always)]
+    fn from(other: OtherT) -> F64Vector128 {
+        return F64Vector128 {
+            vector: other.into()
+        };
+    }
+}
+
 implement_cast_from_for!(F64Vector128, __m128, _mm_castps_pd);
 implement_cast_from_for!(F64Vector128, __m128i, _mm_castsi128_pd);
 implement_cast_into_for!(F64Vector128, __m128, _mm_castpd_ps);
@@ -345,7 +437,7 @@ overload_operator_for!(F64Vector128, BitOr, bitor, BitOrAssign, bitor_assign, _m
 overload_operator_for!(F64Vector128, BitXor, bitxor, BitXorAssign, bitxor_assign, _mm_xor_pd);
 overload_operator_for!(F64Vector128, Div, div, DivAssign, div_assign, _mm_div_pd);
 overload_operator_for!(F64Vector128, Mul, mul, MulAssign, mul_assign, _mm_mul_pd);
-overload_operator_for!(F64Vector128, Sub, sub, SubAssign, sub_assign, _mm_div_pd);
+overload_operator_for!(F64Vector128, Sub, sub, SubAssign, sub_assign, _mm_sub_pd);
 
 //I8Vector128
 //TODO
@@ -370,7 +462,7 @@ impl I8Vector128 {
 //U8Vector128
 impl U8Vector128 {
     #[inline(always)]
-    fn movemask(self: Self) -> i32 {
+    pub fn movemask(self: Self) -> i32 {
         return unsafe { x86_64::_mm_movemask_epi8(self.vector) };
     }
 }
@@ -386,10 +478,10 @@ impl Vector128 for U8Vector128 {
         return Self {
             vector: unsafe {
                 x86_64::_mm_set_epi8(
-                    array[15] as i8, array[14] as i8, array[13] as i8, array[12] as i8,
-                    array[11] as i8, array[10] as i8, array[9] as i8, array[8] as i8,
-                    array[7] as i8, array[6] as i8, array[5] as i8, array[4] as i8,
-                    array[3] as i8, array[2] as i8, array[1] as i8, array[0] as i8
+                    array[0] as i8, array[1] as i8, array[2] as i8, array[3] as i8,
+                    array[4] as i8, array[5] as i8, array[6] as i8, array[7] as i8,
+                    array[8] as i8, array[9] as i8, array[10] as i8, array[11] as i8,
+                    array[12] as i8, array[13] as i8, array[14] as i8, array[15] as i8
                 )
             }
         };
@@ -424,7 +516,7 @@ impl Vector128 for U64Vector128 {
     #[inline(always)]
     fn new_from_array(array: [u64; 2]) -> Self {
         return Self {
-            vector: unsafe { x86_64::_mm_set_epi64x(array[1] as i64, array[0] as i64) }
+            vector: unsafe { x86_64::_mm_set_epi64x(array[0] as i64, array[1] as i64) }
         };
     }
 
