@@ -127,7 +127,7 @@ macro_rules! common_impl_vector128_function_implementations_for_integervector128
 
         #[inline(always)]
         unsafe fn unaligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive) {
-            unsafe { x86_64::_mm_storeu_si128(address as *mut x86_64::__m128i, self.vector); }
+            x86_64::_mm_storeu_si128(address as *mut x86_64::__m128i, self.vector);
         }
 
         #[inline(always)]
@@ -137,7 +137,7 @@ macro_rules! common_impl_vector128_function_implementations_for_integervector128
 
         #[inline(always)]//TODO boilerplate
         unsafe fn aligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive) {
-            unsafe { x86_64::_mm_store_si128(address as *mut x86_64::__m128i, self.vector); }
+            x86_64::_mm_store_si128(address as *mut x86_64::__m128i, self.vector);
         }
     }
 }
@@ -151,12 +151,12 @@ macro_rules! common_impl_vector128_function_implementations_for_integervector128
 pub trait Vector128:
     Copy + Clone + Debug +
     From<x86_64::__m128> + From<x86_64::__m128i> + From<x86_64::__m128d> + Into<x86_64::__m128> + Into<x86_64::__m128i> + Into<x86_64::__m128d> +
+    From<Self::AssociatedPrimitiveArray> + Into<Self::AssociatedPrimitiveArray> +
     Add + AddAssign + BitAnd + BitAndAssign + BitOr + BitOrAssign + BitXor + BitXorAssign + Sub + SubAssign
 {
     type AssociatedPrimitive;
     type AssociatedPrimitiveArray;
 
-    fn new_from_array(array: Self::AssociatedPrimitiveArray) -> Self;
     fn new_broadcasted(scalar: Self::AssociatedPrimitive) -> Self;
     fn new_zeroed() -> Self;
     fn new_uninit() -> MaybeUninit<Self>;
@@ -261,13 +261,6 @@ impl Vector128 for F64Vector128 {
     type AssociatedPrimitiveArray = [f64; 2];
 
     #[inline(always)]
-    fn new_from_array(array: [f64; 2]) -> Self {
-        return Self {
-            vector: unsafe { x86_64::_mm_set_pd(array[0], array[1]) }
-        };
-    }
-
-    #[inline(always)]
     fn new_broadcasted(scalar: f64) -> Self {
         return Self {
             vector: unsafe { x86_64::_mm_set1_pd(scalar) }
@@ -350,6 +343,22 @@ impl<OtherT: IntegerVector128> From<OtherT> for F64Vector128 {
     }
 }
 
+impl From<[f64; 2]> for F64Vector128 {
+    #[inline(always)]
+    fn from(array: [f64; 2]) -> F64Vector128 {
+        return F64Vector128 {
+            vector: unsafe { x86_64::_mm_set_pd(array[0], array[1]) }
+        };
+    }
+}
+
+impl From<F64Vector128> for [f64; 2] {
+    #[inline(always)]
+    fn from(vector: F64Vector128) -> [f64; 2] {
+        todo!();
+    }
+}
+
 implement_cast_from_for!(F64Vector128, __m128, _mm_castps_pd);
 implement_cast_from_for!(F64Vector128, __m128i, _mm_castsi128_pd);
 implement_cast_into_for!(F64Vector128, __m128, _mm_castpd_ps);
@@ -399,8 +408,19 @@ impl Vector128 for U8Vector128 {
     common_impl_vector128_function_implementations_for_integervector128!();
 
     #[inline(always)]
-    fn new_from_array(array: [u8; 16]) -> Self {
-        return Self {
+    fn new_broadcasted(scalar: u8) -> U8Vector128 {
+        return U8Vector128 {
+            vector: unsafe { x86_64::_mm_set1_epi8(scalar as i8) }
+        }
+    }
+
+    //TODO
+}
+
+impl From<[u8; 16]> for U8Vector128 {
+    #[inline(always)]
+    fn from(array: [u8; 16]) -> U8Vector128 {
+        return U8Vector128 {
             vector: unsafe {
                 x86_64::_mm_set_epi8(
                     array[0] as i8, array[1] as i8, array[2] as i8, array[3] as i8,
@@ -411,15 +431,13 @@ impl Vector128 for U8Vector128 {
             }
         };
     }
+}
 
+impl From<U8Vector128> for [u8; 16] {
     #[inline(always)]
-    fn new_broadcasted(scalar: u8) -> U8Vector128 {
-        return U8Vector128 {
-            vector: unsafe { x86_64::_mm_set1_epi8(scalar as i8) }
-        }
+    fn from(vector: U8Vector128) -> [u8; 16] {
+        todo!();
     }
-
-    //TODO
 }
 
 overload_operator_for!(U8Vector128, Add, add, AddAssign, add_assign, _mm_add_epi8);
@@ -439,13 +457,6 @@ impl Vector128 for U64Vector128 {
     common_impl_vector128_function_implementations_for_integervector128!();
 
     #[inline(always)]
-    fn new_from_array(array: [u64; 2]) -> Self {
-        return Self {
-            vector: unsafe { x86_64::_mm_set_epi64x(array[0] as i64, array[1] as i64) }
-        };
-    }
-
-    #[inline(always)]
     fn new_broadcasted(scalar: u64) -> U64Vector128 {
         return U64Vector128 {
             vector: unsafe { x86_64::_mm_set1_epi64x(scalar as i64) }
@@ -453,6 +464,22 @@ impl Vector128 for U64Vector128 {
     }
 
     //TODO
+}
+
+impl From<[u64; 2]> for U64Vector128 {
+    #[inline(always)]
+    fn from(array: [u64; 2]) -> U64Vector128 {
+        return U64Vector128 {
+            vector: unsafe { x86_64::_mm_set_epi64x(array[0] as i64, array[1] as i64) }
+        };
+    }
+}
+
+impl From<U64Vector128> for [u64; 2] {
+    #[inline(always)]
+    fn from(vector: U64Vector128) -> [u64; 2] {
+        todo!();
+    }
 }
 
 impl ShiftableVector128 for U64Vector128 {

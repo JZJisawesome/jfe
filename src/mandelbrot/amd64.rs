@@ -464,8 +464,8 @@ impl Mandelbrot {
         let imag_step_amount_vector = F64Vector128::new_broadcasted(imag_step_amount);//We only process one imaginary coord at a time
 
         let mut c_real = [
-            F64Vector128::new_from_array([self.min_real + (real_step_amount * 3.0), self.min_real + (real_step_amount * 2.0)]),
-            F64Vector128::new_from_array([self.min_real + real_step_amount, self.min_real]),
+            F64Vector128::from([self.min_real + (real_step_amount * 3.0), self.min_real + (real_step_amount * 2.0)]),
+            F64Vector128::from([self.min_real + real_step_amount, self.min_real]),
         ];
         for x in (0..self.x_samples).step_by(4) {
             let mut c_imag = [F64Vector128::new_broadcasted(self.min_imag); 2];
