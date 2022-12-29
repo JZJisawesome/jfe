@@ -38,6 +38,7 @@ pub trait Vector256:
     From<x86_64::__m256> + From<x86_64::__m256i> + From<x86_64::__m256d> + Into<x86_64::__m256> + Into<x86_64::__m256i> + Into<x86_64::__m256d> +
     Add + AddAssign + BitAnd + BitAndAssign + BitOr + BitOrAssign + BitXor + BitXorAssign + Sub + SubAssign
 {
+    type AssociatedHalf;
     type AssociatedPrimitive;
     type AssociatedPrimitiveArray;
 
@@ -51,6 +52,8 @@ pub trait Vector256:
     unsafe fn aligned_load_from(self: Self, address: *const Self::AssociatedPrimitive);
     unsafe fn aligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive);
 
+    //unsafe fn get_low_half(self: Self) -> Self::AssociatedHalf;
+    //unsafe fn get_high_half(self: Self) -> Self::AssociatedHalf;
 }
 //TODO what about conversion to/from smaller vectors?
 
@@ -91,6 +94,7 @@ impl F64Vector256 {
 }
 
 impl Vector256 for F64Vector256 {
+    type AssociatedHalf = x86_64::__m128d;
     type AssociatedPrimitive = f64;
     type AssociatedPrimitiveArray = [f64; 4];
 
