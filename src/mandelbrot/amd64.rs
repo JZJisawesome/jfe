@@ -59,6 +59,15 @@ impl Mandelbrot {
         self.update_sse2();//TESTING
     }
 
+    /*     ___     ____  ______       ____
+     *    / \ \   / /\ \/ /___ \__  _|___ \
+     *   / _ \ \ / /  \  /  __) \ \/ / __) |
+     *  / ___ \ V /   /  \ / __/ >  < / __/
+     * /_/   \_\_/   /_/\_\_____/_/\_\_____|
+     *
+     * AVX2 Mandelbrot implementation, interleaving processing of two vectors at once to better mask latency
+    */
+
     #[cfg(target_arch = "x86_64")]
     #[inline]//But this is okay
     #[target_feature(enable = "avx2")]
@@ -302,6 +311,15 @@ impl Mandelbrot {
 
         self.update_pending = false;
     }
+
+    /*     ___     ____  __      ____
+     *    / \ \   / /\ \/ /__  _|___ \
+     *   / _ \ \ / /  \  / \ \/ / __) |
+     *  / ___ \ V /   /  \  >  < / __/
+     * /_/   \_\_/   /_/\_\/_/\_\_____|
+     *
+     * AVX Mandelbrot implementation, interleaving processing of two vectors at once to better mask latency
+    */
 
     #[cfg(target_arch = "x86_64")]
     #[inline]//But this is okay
@@ -633,6 +651,26 @@ mod benches {
 
     #[bench]
     #[cfg(target_arch = "x86_64")]
+    fn old_update_avx(b: &mut Bencher) {
+        if is_x86_feature_detected!("avx") {
+            let mandelbrot = Mandelbrot::new(
+                1024,
+                128,
+                128,
+                -2.3, 0.8,
+                -1.1, 1.1
+            );
+
+            b.iter(|| -> Mandelbrot {
+                let mut copy = mandelbrot.clone();
+                unsafe { copy.old_update_avx() };
+                return copy;
+            });
+        }
+    }
+
+    #[bench]
+    #[cfg(target_arch = "x86_64")]
     fn update_avx2(b: &mut Bencher) {
         if is_x86_feature_detected!("avx2") {
             let mandelbrot = Mandelbrot::new(
@@ -646,6 +684,26 @@ mod benches {
             b.iter(|| -> Mandelbrot {
                 let mut copy = mandelbrot.clone();
                 unsafe { copy.update_avx2() };
+                return copy;
+            });
+        }
+    }
+
+    #[bench]
+    #[cfg(target_arch = "x86_64")]
+    fn old_update_avx2(b: &mut Bencher) {
+        if is_x86_feature_detected!("avx2") {
+            let mandelbrot = Mandelbrot::new(
+                1024,
+                128,
+                128,
+                -2.3, 0.8,
+                -1.1, 1.1
+            );
+
+            b.iter(|| -> Mandelbrot {
+                let mut copy = mandelbrot.clone();
+                unsafe { copy.old_update_avx2() };
                 return copy;
             });
         }

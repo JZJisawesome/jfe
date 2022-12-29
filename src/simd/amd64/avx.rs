@@ -36,13 +36,13 @@ pub mod compare_ops {
 pub trait Vector256:
     Copy + Clone + Debug +
     From<x86_64::__m256> + From<x86_64::__m256i> + From<x86_64::__m256d> + Into<x86_64::__m256> + Into<x86_64::__m256i> + Into<x86_64::__m256d> +
+    From<Self::AssociatedPrimitiveArray> + Into<Self::AssociatedPrimitiveArray> +
     Add + AddAssign + BitAnd + BitAndAssign + BitOr + BitOrAssign + BitXor + BitXorAssign + Sub + SubAssign
 {
     type AssociatedHalf;
     type AssociatedPrimitive;
     type AssociatedPrimitiveArray;
 
-    fn new_from_array(array: Self::AssociatedPrimitiveArray) -> Self;
     fn new_broadcasted(scalar: Self::AssociatedPrimitive) -> Self;
     fn new_zeroed() -> Self;
     fn new_uninit() -> MaybeUninit<Self>;
@@ -97,13 +97,6 @@ impl Vector256 for F64Vector256 {
     type AssociatedHalf = x86_64::__m128d;
     type AssociatedPrimitive = f64;
     type AssociatedPrimitiveArray = [f64; 4];
-
-    #[inline(always)]
-    fn new_from_array(array: [f64; 4]) -> Self {
-        return Self {
-            vector: unsafe { x86_64::_mm256_set_pd(array[0], array[1], array[2], array[3]) }
-        };
-    }
 
     #[inline(always)]
     fn new_broadcasted(scalar: f64) -> Self {
@@ -174,6 +167,22 @@ impl From<F32Vector256> for F64Vector256 {
             vector: other.into()
         };
         */
+        todo!();
+    }
+}
+
+impl From<[f64; 4]> for F64Vector256 {
+    #[inline(always)]
+    fn from(array: [f64; 4]) -> F64Vector256 {
+        return Self {
+            vector: unsafe { x86_64::_mm256_set_pd(array[0], array[1], array[2], array[3]) }
+        };
+    }
+}
+
+impl From<F64Vector256> for [f64; 4] {
+    #[inline(always)]
+    fn from(vector: F64Vector256) -> [f64; 4] {
         todo!();
     }
 }
