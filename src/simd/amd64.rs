@@ -7,28 +7,14 @@
 
 /* Imports */
 
-#[cfg(target_feature = "sse2")]
 pub mod base;
-
-#[cfg(target_feature = "sse3")]
 pub mod sse3;
-
-#[cfg(target_feature = "ssse3")]
 pub mod ssse3;
-
-#[cfg(target_feature = "sse4.1")]
 pub mod sse41;
-
-#[cfg(target_feature = "sse4.2")]
 pub mod sse42;
-
-#[cfg(target_feature = "avx")]
 pub mod avx;
-
-#[cfg(target_feature = "avx2")]
 pub mod avx2;
 
-#[cfg(target_feature = "sse2")]
 pub use base::*;
 
 /* Constants */
