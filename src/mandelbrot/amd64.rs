@@ -11,7 +11,7 @@ use super::Mandelbrot;
 
 use core::arch::x86_64;
 
-use crate::simd::amd64::{Vector128, Comparable, U8Vector128, U64Vector128, F64Vector128};
+use crate::simd::amd64::{Vector128, ComparableVector128, U8Vector128, U64Vector128, F64Vector128};
 
 /*
 fn test() {
@@ -46,6 +46,18 @@ fn test() {
 /* Associated Functions and Methods */
 
 impl Mandelbrot {
+    //Detect CPU features and choose the fastest supported implementation
+    #[cfg(target_arch = "x86_64")]
+    pub(super) unsafe fn update_x86_64(self: &mut Self) {
+        /*if is_x86_feature_detected!("avx2") {
+            self.update_avx2();
+        } else if is_x86_feature_detected!("avx") {
+            self.update_avx();
+        } else {
+            self.update_sse2();//On x86_64, we can assume SSE2
+        }*/
+        self.update_sse2();//TESTING
+    }
 
     #[cfg(target_arch = "x86_64")]
     #[inline]//But this is okay
@@ -377,7 +389,15 @@ impl Mandelbrot {
         self.update_pending = false;
     }
 
-    //Go faster by doing two vectors at once, so that we can exploit the pipeline better
+    /*  ____ ____  _____ ____       ____
+     * / ___/ ___|| ____|___ \__  _|___ \
+     * \___ \___ \|  _|   __) \ \/ / __) |
+     *  ___) |__) | |___ / __/ >  < / __/
+     * |____/____/|_____|_____/_/\_\_____|
+     *
+     * SSE2 Mandelbrot implementation, interleaving processing of two vectors at once to better mask latency
+    */
+
     //#[inline(always)]//Can't do this with the second "#[target_feature(enable = "sse2")]"
     #[cfg(target_arch = "x86_64")]
     #[inline]//But this is okay
@@ -460,18 +480,6 @@ impl Mandelbrot {
         }
 
         self.update_pending = false;
-    }
-
-    #[cfg(target_arch = "x86_64")]
-    pub(super) unsafe fn update_x86_64(self: &mut Self) {
-        /*if is_x86_feature_detected!("avx2") {
-            self.update_avx2();
-        } else if is_x86_feature_detected!("avx") {
-            self.update_avx();
-        } else {
-            self.update_sse2();//On x86_64, we can assume SSE2
-        }*/
-        self.update_sse2();//TESTING
     }
 }
 
