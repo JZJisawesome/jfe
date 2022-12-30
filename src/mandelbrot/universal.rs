@@ -8,6 +8,7 @@
 /* Imports */
 
 use super::Mandelbrot;
+use super::Workload;
 
 use std::thread;
 
@@ -57,7 +58,7 @@ impl Mandelbrot {
         return i;
     }
 
-    fn update_universal_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
+    fn update_universal_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Workload) {
         for (line_slice, c_imag) in workload {
             let mut c_real: f64 = starting_c_real;
             for x in 0..line_slice.len() {
@@ -86,8 +87,8 @@ mod benches {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
-            128,
-            128,
+            512,
+            512,
             -2.3, 0.8,
             -1.1, 1.1
         );
@@ -105,8 +106,8 @@ mod benches {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
-            128,
-            128,
+            512,
+            512,
             -2.3, 0.8,
             -1.1, 1.1
         );

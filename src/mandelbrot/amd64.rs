@@ -8,6 +8,7 @@
 /* Imports */
 
 use super::Mandelbrot;
+use super::Workload;
 
 use core::arch::x86_64;
 
@@ -147,7 +148,7 @@ impl Mandelbrot {
 
     #[inline]
     #[target_feature(enable = "avx")]
-    unsafe fn mandelbrot_iterations_avx(self: &Self, c_real_f: [amd64::avx::F64Vector256; 2], c_imag_f: [amd64::avx::F64Vector256; 2]) -> [U64Vector128; 4] {
+    unsafe fn mandelbrot_iterations_avx(max_iterations: usize, c_real_f: [amd64::avx::F64Vector256; 2], c_imag_f: [amd64::avx::F64Vector256; 2]) -> [U64Vector128; 4] {
         use amd64::avx::Vector256;
         use amd64::avx::FloatVector256;
         use amd64::avx::F64Vector256;
@@ -164,7 +165,7 @@ impl Mandelbrot {
         let mut z_real_f = [F64Vector256::new_zeroed(); 2];
         let mut z_imag_f = [F64Vector256::new_zeroed(); 2];
 
-        for _ in 0..self.max_iterations {
+        for _ in 0..max_iterations {
             //Calculate some values that are used below
             let z_real_squared_f = [z_real_f[0] * z_real_f[0], z_real_f[1] * z_real_f[1]];
             let z_imag_squared_f = [z_imag_f[0] * z_imag_f[0], z_imag_f[1] * z_imag_f[1]];
@@ -213,48 +214,45 @@ impl Mandelbrot {
     }
 
     #[target_feature(enable = "avx")]
-    unsafe fn update_avx(self: &mut Self) {
+    unsafe fn update_avx_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Workload) {
         use amd64::avx::Vector256;
         use amd64::avx::F64Vector256;
 
-        debug_assert!((self.x_samples & 0b111) == 0);//TODO overcome this limitation
-
-
-        let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);
-        let imag_length: f64 = self.max_imag - self.min_imag;
-        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
-
-        let iterations_pointer = self.iterations.as_mut_ptr();
-
         let real_step_amount_vector = F64Vector256::new_broadcasted(real_step_amount * 8.0);//x8 since we process eight real coords at a time (with two F64Vector256s)
-        let imag_step_amount_vector = F64Vector256::new_broadcasted(imag_step_amount);//We only process one imaginary coord at a time
 
-        let mut c_real = [
-            F64Vector256::from([
-                self.min_real + (real_step_amount * 7.0), self.min_real + (real_step_amount * 6.0),
-                self.min_real + (real_step_amount * 5.0), self.min_real + (real_step_amount * 4.0)
-            ]),
-            F64Vector256::from([
-                self.min_real + (real_step_amount * 3.0), self.min_real + (real_step_amount * 2.0),
-                self.min_real + real_step_amount, self.min_real
-            ]),
-        ];
+        for (line_slice, c_imag_scalar) in workload {
+            debug_assert!((line_slice.len() & 0b111) == 0);//TODO overcome this limitation
 
-        for x in (0..self.x_samples).step_by(8) {
-            let mut c_imag = [F64Vector256::new_broadcasted(self.min_imag); 2];
-            for y in 0..self.y_samples {
-                let result = self.mandelbrot_iterations_avx(c_real, c_imag);
-                let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut u64;
+            let line_slice_pointer = line_slice.as_mut_ptr();
+
+            let c_imag = [F64Vector256::new_broadcasted(c_imag_scalar); 2];
+
+            let mut c_real = [
+                F64Vector256::from([
+                    starting_c_real + (real_step_amount * 7.0), starting_c_real + (real_step_amount * 6.0),
+                    starting_c_real + (real_step_amount * 5.0), starting_c_real + (real_step_amount * 4.0)
+                ]),
+                F64Vector256::from([
+                    starting_c_real + (real_step_amount * 3.0), starting_c_real + (real_step_amount * 2.0),
+                    starting_c_real + real_step_amount, starting_c_real
+                ]),
+            ];
+
+            for x in (0..line_slice.len()).step_by(8) {
+                let result = Self::mandelbrot_iterations_avx(max_iterations, c_real, c_imag);
+                let pointer = line_slice_pointer.offset(x as isize) as *mut u64;
                 result[3].unaligned_store_to(pointer);
                 result[2].unaligned_store_to(pointer.offset(2));
                 result[1].unaligned_store_to(pointer.offset(4));
                 result[0].unaligned_store_to(pointer.offset(6));
-                c_imag = [c_imag[0] + imag_step_amount_vector, c_imag[1] + imag_step_amount_vector];
+                c_real = [c_real[0] + real_step_amount_vector, c_real[1] + real_step_amount_vector];
             }
-            c_real = [c_real[0] + real_step_amount_vector, c_real[1] + real_step_amount_vector];
         }
-        self.update_pending = false;
+    }
+
+    #[target_feature(enable = "avx")]
+    unsafe fn update_avx(self: &mut Self) {
+        self.update_with_unsafe_line_function(Self::update_avx_line);
     }
 
     /*  ____ ____  _____ ____       ____
@@ -316,7 +314,7 @@ impl Mandelbrot {
     }
 
     #[target_feature(enable = "sse2")]
-    unsafe fn update_sse2_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
+    unsafe fn update_sse2_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Workload) {
         let real_step_amount_vector = F64Vector128::new_broadcasted(real_step_amount * 4.0);//x4 since we process four real coords at a time (with two F64Vector128s)
 
         for (line_slice, c_imag_scalar) in workload {
@@ -426,8 +424,8 @@ mod benches {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
-            128,
-            128,
+            512,
+            512,
             -2.3, 0.8,
             -1.1, 1.1
         );
@@ -445,8 +443,8 @@ mod benches {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
-            128,
-            128,
+            512,
+            512,
             -2.3, 0.8,
             -1.1, 1.1
         );
@@ -465,12 +463,32 @@ mod benches {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
-            128,
-            128,
+            512,
+            512,
             -2.3, 0.8,
             -1.1, 1.1
         );
         mandelbrot.set_max_threads(1);
+
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            unsafe { copy.update_avx() };
+            return copy;
+        });
+    }
+
+    #[bench]
+    fn update_avx_mt(b: &mut Bencher) {
+        assert!(is_x86_feature_detected!("avx"));
+        use crate::BaseFractal;
+        let mut mandelbrot = Mandelbrot::new(
+            1024,
+            512,
+            512,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+        mandelbrot.set_max_threads(std::thread::available_parallelism().expect("Couldn't determine num of host threads").get());//It will just fail otherwise
 
         b.iter(|| -> Mandelbrot {
             let mut copy = mandelbrot.clone();
@@ -485,8 +503,8 @@ mod benches {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
-            128,
-            128,
+            512,
+            512,
             -2.3, 0.8,
             -1.1, 1.1
         );
