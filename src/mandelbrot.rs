@@ -193,3 +193,48 @@ impl EscapeTimeFractal for Mandelbrot {
 /* Functions */
 
 //TODO
+
+/* Benches */
+
+#[cfg_attr(feature = "nightly-features-benches", cfg(test))]
+#[cfg(feature = "nightly-features-benches")]
+mod benches {
+    extern crate test;
+    use test::Bencher;
+    use super::*;
+
+    #[bench]
+    fn create_mandelbrot(b: &mut Bencher) {
+        b.iter(|| -> Mandelbrot {
+            use crate::BaseFractal;
+            let mut mandelbrot = Mandelbrot::new(
+                1024,
+                128,
+                128,
+                -2.3, 0.8,
+                -1.1, 1.1
+            );
+            mandelbrot.set_max_threads(1);
+
+            return mandelbrot;
+        });
+    }
+
+    #[bench]
+    fn copy_overhead(b: &mut Bencher) {
+        use crate::BaseFractal;
+        let mut mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+        mandelbrot.set_max_threads(1);
+
+        b.iter(|| -> Mandelbrot {
+            let copy = mandelbrot.clone();
+            return copy;
+        });
+    }
+}

@@ -423,45 +423,16 @@ mod benches {
     use super::*;
 
     #[bench]
-    fn create_mandelbrot(b: &mut Bencher) {
-        b.iter(|| -> Mandelbrot {
-            let mandelbrot = Mandelbrot::new(
-                1024,
-                128,
-                128,
-                -2.3, 0.8,
-                -1.1, 1.1
-            );
-
-            return mandelbrot;
-        });
-    }
-
-    #[bench]
-    fn copy_overhead(b: &mut Bencher) {
-        let mandelbrot = Mandelbrot::new(
-            1024,
-            128,
-            128,
-            -2.3, 0.8,
-            -1.1, 1.1
-        );
-
-        b.iter(|| -> Mandelbrot {
-            let copy = mandelbrot.clone();
-            return copy;
-        });
-    }
-
-    #[bench]
     fn update_sse2(b: &mut Bencher) {
-        let mandelbrot = Mandelbrot::new(
+        use crate::BaseFractal;
+        let mut mandelbrot = Mandelbrot::new(
             1024,
             128,
             128,
             -2.3, 0.8,
             -1.1, 1.1
         );
+        mandelbrot.set_max_threads(1);
 
         b.iter(|| -> Mandelbrot {
             let mut copy = mandelbrot.clone();
@@ -472,39 +443,41 @@ mod benches {
 
     #[bench]
     fn update_avx(b: &mut Bencher) {
-        if is_x86_feature_detected!("avx") {
-            let mandelbrot = Mandelbrot::new(
-                1024,
-                128,
-                128,
-                -2.3, 0.8,
-                -1.1, 1.1
-            );
+        assert!(is_x86_feature_detected!("avx"));
+        use crate::BaseFractal;
+        let mut mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+        mandelbrot.set_max_threads(1);
 
-            b.iter(|| -> Mandelbrot {
-                let mut copy = mandelbrot.clone();
-                unsafe { copy.update_avx() };
-                return copy;
-            });
-        }
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            unsafe { copy.update_avx() };
+            return copy;
+        });
     }
 
     #[bench]
     fn update_avx2(b: &mut Bencher) {
-        if is_x86_feature_detected!("avx2") {
-            let mandelbrot = Mandelbrot::new(
-                1024,
-                128,
-                128,
-                -2.3, 0.8,
-                -1.1, 1.1
-            );
+        assert!(is_x86_feature_detected!("avx2"));
+        use crate::BaseFractal;
+        let mut mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+        mandelbrot.set_max_threads(1);
 
-            b.iter(|| -> Mandelbrot {
-                let mut copy = mandelbrot.clone();
-                unsafe { copy.update_avx2() };
-                return copy;
-            });
-        }
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            unsafe { copy.update_avx2() };
+            return copy;
+        });
     }
 }
