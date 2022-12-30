@@ -14,6 +14,8 @@ use core::arch::x86_64;
 use crate::simd::amd64;//DON'T use anything modules within this at the module scope so that we don't unintentionally use it when we didn't mean to
 use crate::simd::amd64::{Vector128, ComparableVector128, U8Vector128, U64Vector128, F64Vector128};//Base types are okay since we assume we are on amd64
 
+use std::thread;
+
 /* Constants */
 
 //TODO
@@ -38,13 +40,14 @@ impl Mandelbrot {
     //Detect CPU features and choose the fastest supported implementation
 
     pub(super) unsafe fn update_x86_64(self: &mut Self) {
-        if is_x86_feature_detected!("avx2") {
+        /*if is_x86_feature_detected!("avx2") {
             self.update_avx2();
         } else if is_x86_feature_detected!("avx") {
             self.update_avx();
         } else {
             self.update_sse2();//On x86_64, we can assume SSE2
-        }
+        }*/
+        self.update_sse2();//TESTING
     }
 
     /*     ___     ____  ______       ____
@@ -266,7 +269,7 @@ impl Mandelbrot {
     //#[inline(always)]//Can't do this with the second "#[target_feature(enable = "sse2")]"
     #[inline]//But this is okay
     #[target_feature(enable = "sse2")]
-    unsafe fn mandelbrot_iterations_sse2(self: &Self, c_real_f: [F64Vector128; 2], c_imag_f: [F64Vector128; 2]) -> [U64Vector128; 2] {
+    unsafe fn mandelbrot_iterations_sse2(max_iterations: usize, c_real_f: [F64Vector128; 2], c_imag_f: [F64Vector128; 2]) -> [U64Vector128; 2] {
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
 
         let diverge_threshold_squared_f = F64Vector128::new_broadcasted(diverge_threshold * diverge_threshold);
@@ -279,7 +282,7 @@ impl Mandelbrot {
         let mut z_real_f = [F64Vector128::new_zeroed(); 2];
         let mut z_imag_f = [F64Vector128::new_zeroed(); 2];
 
-        for _ in 0..self.max_iterations {
+        for _ in 0..max_iterations {
             //Calculate some values that are used below
             let z_real_squared_f = [z_real_f[0] * z_real_f[0], z_real_f[1] * z_real_f[1]];
             let z_imag_squared_f = [z_imag_f[0] * z_imag_f[0], z_imag_f[1] * z_imag_f[1]];
@@ -313,7 +316,7 @@ impl Mandelbrot {
     }
 
     #[target_feature(enable = "sse2")]
-    unsafe fn update_sse2(self: &mut Self) {
+    unsafe fn update_sse2_st(self: &mut Self) {
         debug_assert!((self.x_samples & 0b11) == 0);//TODO overcome this limitation
 
         let real_length: f64 = self.max_real - self.min_real;
@@ -333,7 +336,7 @@ impl Mandelbrot {
         for x in (0..self.x_samples).step_by(4) {
             let mut c_imag = [F64Vector128::new_broadcasted(self.min_imag); 2];
             for y in 0..self.y_samples {
-                let result = self.mandelbrot_iterations_sse2(c_real, c_imag);
+                let result = Self::mandelbrot_iterations_sse2(self.max_iterations, c_real, c_imag);
                 let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut u64;
                 result[1].unaligned_store_to(pointer);
                 result[0].unaligned_store_to(pointer.offset(2));
@@ -343,6 +346,86 @@ impl Mandelbrot {
         }
 
         self.update_pending = false;
+    }
+
+    #[target_feature(enable = "sse2")]
+    unsafe fn update_sse2_mt(self: &mut Self) {
+        let real_length: f64 = self.max_real - self.min_real;
+        let real_step_amount: f64 = real_length / (self.x_samples as f64);//Per line
+        let imag_length: f64 = self.max_imag - self.min_imag;
+        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
+
+        type LineWorkload<'a> = (&'a mut [usize], f64);
+        type Workload<'a> = Vec::<LineWorkload<'a>>;
+
+        let mut workloads = Vec::<Workload>::with_capacity(self.max_threads);
+        workloads.resize_with(self.max_threads, || { Vec::<LineWorkload>::new() });
+
+        //Distribute work by splitting into lines
+        //Split into horizontal lines
+        let mut c_imag: f64 = self.min_imag;
+        let mut counter_across_threads = 0;
+        for line_slice in self.iterations.chunks_mut(self.x_samples) {
+            workloads[counter_across_threads].push((line_slice, c_imag));
+
+            c_imag += imag_step_amount;
+
+            counter_across_threads += 1;
+            if counter_across_threads == self.max_threads {
+                counter_across_threads = 0;
+            }
+        }
+
+        //Create threads and join them at the end of the scope
+        debug_assert!(workloads.len() == self.max_threads);
+        thread::scope(|s| {
+            while let Some(workload) = workloads.pop() {
+                let max_iterations_copy = self.max_iterations;
+                let min_real_copy = self.min_real;
+                let real_step_amount_copy = real_step_amount;
+
+                s.spawn(move || {
+                    Self::update_sse2_mt_thread(
+                        max_iterations_copy, min_real_copy, real_step_amount_copy,
+                        workload
+                    );
+                });
+            }
+        });
+        self.update_pending = false;
+    }
+
+    #[target_feature(enable = "sse2")]
+    unsafe fn update_sse2_mt_thread(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
+        let real_step_amount_vector = F64Vector128::new_broadcasted(real_step_amount * 4.0);//x4 since we process four real coords at a time (with two F64Vector128s)
+
+        for (line_slice, c_imag_scalar) in workload {
+            debug_assert!((line_slice.len() & 0b11) == 0);//TODO overcome this limitation
+            let line_slice_pointer = line_slice.as_mut_ptr();
+
+            let c_imag = [F64Vector128::new_broadcasted(c_imag_scalar); 2];
+
+            let mut c_real = [
+                F64Vector128::from([starting_c_real + (real_step_amount * 3.0), starting_c_real + (real_step_amount * 2.0)]),
+                F64Vector128::from([starting_c_real + real_step_amount, starting_c_real]),
+            ];
+
+            for x in (0..line_slice.len()).step_by(4) {
+                let result = Self::mandelbrot_iterations_sse2(max_iterations, c_real, c_imag);
+                let pointer = line_slice_pointer.offset(x as isize) as *mut u64;
+                result[1].unaligned_store_to(pointer);
+                result[0].unaligned_store_to(pointer.offset(2));
+                c_real = [c_real[0] + real_step_amount_vector, c_real[1] + real_step_amount_vector];
+            }
+        }
+    }
+
+    unsafe fn update_sse2(self: &mut Self) {
+        if self.max_threads == 1 {
+            self.update_sse2_st();
+        } else {
+            self.update_sse2_mt();
+        }
     }
 }
 
@@ -433,6 +516,25 @@ mod benches {
             -1.1, 1.1
         );
         mandelbrot.set_max_threads(1);
+
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            unsafe { copy.update_sse2() };
+            return copy;
+        });
+    }
+
+    #[bench]
+    fn update_sse2_mt(b: &mut Bencher) {
+        use crate::BaseFractal;
+        let mut mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+        mandelbrot.set_max_threads(std::thread::available_parallelism().expect("Couldn't determine num of host threads").get());//It will just fail otherwise
 
         b.iter(|| -> Mandelbrot {
             let mut copy = mandelbrot.clone();

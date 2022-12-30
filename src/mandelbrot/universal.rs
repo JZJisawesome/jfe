@@ -10,8 +10,6 @@
 use super::Mandelbrot;
 
 use std::thread;
-//use std::sync::mpsc;
-use std::thread::JoinHandle;
 
 /* Constants */
 
@@ -34,7 +32,6 @@ use std::thread::JoinHandle;
 impl Mandelbrot {
     #[inline(always)]
     fn mandelbrot_iterations_universal(max_iterations: usize, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
-        //println!("mandelbrot iteration with params: {} {}", c_real, c_imag);
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
 
         //z_0 = 0
@@ -45,13 +42,11 @@ impl Mandelbrot {
         //or the modulus of the complex number exceeds the diverge_threshold (meaning the c value produces an unbounded series)
         let mut i: usize = 0;
         while (i < max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (diverge_threshold * diverge_threshold)) {
-            //println!("iteration {} starts: z_real {}, z_imag {}", i, z_real, z_imag);
             //z_(n+1) = z_n^2 + c
             let next_z_real = (z_real * z_real) - (z_imag * z_imag) + c_real;
             let next_z_imag = (2.0 * z_real * z_imag) + c_imag;
             z_real = next_z_real;
             z_imag = next_z_imag;
-            //println!("iteration {} ends: z_real {}, z_imag {}", i, z_real, z_imag);
             i += 1;
         }
         //println!("mandelbrot ends returning {}", i);
@@ -174,7 +169,7 @@ mod benches {
     }
 
     #[bench]
-    fn update_universal_threaded(b: &mut Bencher) {
+    fn update_universal_mt(b: &mut Bencher) {
         use crate::BaseFractal;
         let mut mandelbrot = Mandelbrot::new(
             1024,
