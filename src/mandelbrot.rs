@@ -95,11 +95,12 @@ impl BaseFractal for Mandelbrot {
 
     //Update Samples
     fn update(self: &mut Self) {
-        if cfg!(target_arch = "x86_64") {
+        /*if cfg!(target_arch = "x86_64") {
             unsafe { self.update_x86_64(); }
         } else {
             self.update_universal();
-        }
+        }*/
+        self.update_universal();//TESTING
     }
 }
 

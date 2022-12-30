@@ -10,7 +10,8 @@
 use super::Mandelbrot;
 
 use std::thread;
-use std::sync::mpsc;
+//use std::sync::mpsc;
+use std::thread::JoinHandle;
 
 /* Constants */
 
@@ -85,34 +86,53 @@ impl Mandelbrot {
 
     fn update_universal_mt(self: &mut Self) {
         let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);
+        let real_step_amount: f64 = real_length / (self.x_samples as f64);//Per line
         let imag_length: f64 = self.max_imag - self.min_imag;
         let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
 
-        //The message sent to threads is Some((x_pixel_offset, starting_real_value)) or None to indicate they should terminate
-        type Message = Option<(usize, f64)>;
+        type LineWorkload<'a> = (&'a mut [usize], f64);
+        type Workload<'a> = Vec::<LineWorkload<'a>>;
 
-        let mut sender_vector = Vec::<mpsc::Sender<Message>>::with_capacity(self.max_threads);
+        let mut workloads = Vec::<Workload>::with_capacity(self.max_threads);
+        workloads.resize_with(self.max_threads, || { Vec::<LineWorkload>::new() });
 
-        //Create threads
-        let iterations_pointer = self.iterations.as_mut_ptr();
-        for _ in 0..self.max_threads {
-            let (tx, rx) = mpsc::channel::<Message>();
-            sender_vector.push(tx);
+        //Distribute work by splitting into lines
+        //let mut join_handle_vector = Vec::<JoinHandle<()>>::with_capacity(self.max_threads);
+        //Split into horizontal lines
+        let mut c_real: f64 = self.min_real;
+        let mut counter_across_threads = 0;
+        for line_slice in self.iterations.chunks_mut(self.x_samples) {
+            workloads[counter_across_threads].push((line_slice, c_real));
 
-            let pointer_copy = iterations_pointer.clone();
+            c_real += real_step_amount;
 
-            //thread::spawn(move || { self.update_universal_mt_thread(rx, pointer_copy); });
+            counter_across_threads += 1;
+            if counter_across_threads == self.max_threads {
+                counter_across_threads = 0;
+            }
         }
 
-        //Distribute work
-        //TODO
+        //Create threads and join them at the end of the scope
+        debug_assert!(workloads.len() == self.max_threads);
+        thread::scope(|s| {
+            while let Some(workload) = workloads.pop() {
+                let y_samples_copy = self.y_samples;
+                let min_imag_copy = self.min_imag;
+                let imag_length_copy = imag_length;
+                let imag_step_amount_copy = imag_step_amount;
 
-        //Wait for threads to finish
-        //TODO
+                s.spawn(move || {
+                    Self::update_universal_mt_thread(
+                        y_samples_copy, min_imag_copy, imag_length_copy, imag_step_amount_copy,
+                        workload
+                    );
+                });
+            }
+        });
+        self.update_pending = false;
     }
 
-    fn update_universal_mt_thread(self: &Self, reciever: mpsc::Receiver<Option<(usize, f64)>>,  iterations_pointer: *mut usize) {
+    fn update_universal_mt_thread(y_samples: usize, starting_c_imag: f64, imag_length: f64, imag_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
         todo!();
     }
 }

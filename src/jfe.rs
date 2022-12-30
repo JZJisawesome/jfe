@@ -8,6 +8,7 @@ fn main() {
             if let Ok(fractal_box) = jfe::ini::section_to_fractal(&section) {
                 match fractal_box {
                     EscapeTime(mut fractal) => {
+                        fractal.set_max_threads(std::thread::available_parallelism().unwrap().get());
                         fractal.update();
                         //TODO what if it is not 255 max iterations?
 
