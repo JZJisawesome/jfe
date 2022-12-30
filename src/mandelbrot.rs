@@ -15,6 +15,8 @@ use std::ops::IndexMut;
 use crate::BaseFractal;
 use crate::EscapeTimeFractal;
 
+use std::thread;
+
 /* Constants */
 
 //TODO
@@ -44,6 +46,11 @@ pub struct Mandelbrot {
     iterations: Vec::<usize>,//For cheap resizing in case the user changes x_samples or y_samples
     update_pending: bool,
 }
+
+type LineWorkload<'a> = (&'a mut [usize], f64);
+type Workload<'a> = Vec::<LineWorkload<'a>>;
+
+/* Associated Functions and Methods */
 
 impl Mandelbrot {
     //NOTE: it is okay if min/max real/imag values are flipped, it will just flip the image
@@ -79,6 +86,74 @@ impl Mandelbrot {
         debug_assert!(x < self.x_samples);
         debug_assert!(y < self.y_samples);
         return self.iterations.index_mut(x + (y * self.x_samples));
+    }
+
+    fn update_with_line_function(self: &mut Self, function: fn(usize, f64, f64, Workload)) {
+        unsafe { self.update_with_unsafe_line_function(function); }//Safe since the line is safe
+    }
+
+    unsafe fn update_with_unsafe_line_function(self: &mut Self, function: unsafe fn(usize, f64, f64, Workload)) {
+        let real_length: f64 = self.max_real - self.min_real;
+        let real_step_amount: f64 = real_length / (self.x_samples as f64);//Per line
+        let imag_length: f64 = self.max_imag - self.min_imag;
+        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
+
+        debug_assert!(self.max_threads != 0);
+        if self.max_threads == 1 {
+            let mut st_workload = Workload::with_capacity(self.y_samples);
+            //Split into horizontal lines, pushing each to a single Workload
+            let mut c_imag: f64 = self.min_imag;
+            let mut counter_across_threads = 0;
+            for line_slice in self.iterations.chunks_mut(self.x_samples) {
+                st_workload.push((line_slice, c_imag));
+
+                c_imag += imag_step_amount;
+
+                counter_across_threads += 1;
+                if counter_across_threads == self.max_threads {
+                    counter_across_threads = 0;
+                }
+            }
+
+            //Execute the workload
+            function(self.max_iterations, self.min_real, real_step_amount, st_workload);
+        } else {
+            let mut workloads = Vec::<Workload>::with_capacity(self.max_threads);
+            workloads.resize_with(self.max_threads, || { Vec::<LineWorkload>::new() });
+
+            //Distribute work by splitting into lines
+            //Split into horizontal lines
+            let mut c_imag: f64 = self.min_imag;
+            let mut counter_across_threads = 0;
+            for line_slice in self.iterations.chunks_mut(self.x_samples) {
+                workloads[counter_across_threads].push((line_slice, c_imag));
+
+                c_imag += imag_step_amount;
+
+                counter_across_threads += 1;
+                if counter_across_threads == self.max_threads {
+                    counter_across_threads = 0;
+                }
+            }
+
+            //Create threads and join them at the end of the scope
+            debug_assert!(workloads.len() == self.max_threads);
+            thread::scope(|s| {
+                while let Some(workload) = workloads.pop() {
+                    let max_iterations_copy = self.max_iterations;
+                    let min_real_copy = self.min_real;
+                    let real_step_amount_copy = real_step_amount;
+
+                    s.spawn(move || {
+                        function(
+                            max_iterations_copy, min_real_copy, real_step_amount_copy,
+                            workload
+                        );
+                    });
+                }
+            });
+            self.update_pending = false;
+        }
     }
 }
 
@@ -190,10 +265,6 @@ impl EscapeTimeFractal for Mandelbrot {
         return Some(&self.iterations);
     }
 }
-
-/* Associated Functions and Methods */
-
-//TODO
 
 /* Functions */
 

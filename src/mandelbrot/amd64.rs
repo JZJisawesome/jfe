@@ -316,87 +316,7 @@ impl Mandelbrot {
     }
 
     #[target_feature(enable = "sse2")]
-    unsafe fn update_sse2_st(self: &mut Self) {
-        debug_assert!((self.x_samples & 0b11) == 0);//TODO overcome this limitation
-
-        let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);
-        let imag_length: f64 = self.max_imag - self.min_imag;
-        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
-
-        let iterations_pointer = self.iterations.as_mut_ptr();
-
-        let real_step_amount_vector = F64Vector128::new_broadcasted(real_step_amount * 4.0);//x4 since we process four real coords at a time (with two F64Vector128s)
-        let imag_step_amount_vector = F64Vector128::new_broadcasted(imag_step_amount);//We only process one imaginary coord at a time
-
-        let mut c_real = [
-            F64Vector128::from([self.min_real + (real_step_amount * 3.0), self.min_real + (real_step_amount * 2.0)]),
-            F64Vector128::from([self.min_real + real_step_amount, self.min_real]),
-        ];
-        for x in (0..self.x_samples).step_by(4) {
-            let mut c_imag = [F64Vector128::new_broadcasted(self.min_imag); 2];
-            for y in 0..self.y_samples {
-                let result = Self::mandelbrot_iterations_sse2(self.max_iterations, c_real, c_imag);
-                let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut u64;
-                result[1].unaligned_store_to(pointer);
-                result[0].unaligned_store_to(pointer.offset(2));
-                c_imag = [c_imag[0] + imag_step_amount_vector, c_imag[1] + imag_step_amount_vector];
-            }
-            c_real = [c_real[0] + real_step_amount_vector, c_real[1] + real_step_amount_vector];
-        }
-
-        self.update_pending = false;
-    }
-
-    #[target_feature(enable = "sse2")]
-    unsafe fn update_sse2_mt(self: &mut Self) {
-        let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);//Per line
-        let imag_length: f64 = self.max_imag - self.min_imag;
-        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
-
-        type LineWorkload<'a> = (&'a mut [usize], f64);
-        type Workload<'a> = Vec::<LineWorkload<'a>>;
-
-        let mut workloads = Vec::<Workload>::with_capacity(self.max_threads);
-        workloads.resize_with(self.max_threads, || { Vec::<LineWorkload>::new() });
-
-        //Distribute work by splitting into lines
-        //Split into horizontal lines
-        let mut c_imag: f64 = self.min_imag;
-        let mut counter_across_threads = 0;
-        for line_slice in self.iterations.chunks_mut(self.x_samples) {
-            workloads[counter_across_threads].push((line_slice, c_imag));
-
-            c_imag += imag_step_amount;
-
-            counter_across_threads += 1;
-            if counter_across_threads == self.max_threads {
-                counter_across_threads = 0;
-            }
-        }
-
-        //Create threads and join them at the end of the scope
-        debug_assert!(workloads.len() == self.max_threads);
-        thread::scope(|s| {
-            while let Some(workload) = workloads.pop() {
-                let max_iterations_copy = self.max_iterations;
-                let min_real_copy = self.min_real;
-                let real_step_amount_copy = real_step_amount;
-
-                s.spawn(move || {
-                    Self::update_sse2_mt_thread(
-                        max_iterations_copy, min_real_copy, real_step_amount_copy,
-                        workload
-                    );
-                });
-            }
-        });
-        self.update_pending = false;
-    }
-
-    #[target_feature(enable = "sse2")]
-    unsafe fn update_sse2_mt_thread(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
+    unsafe fn update_sse2_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
         let real_step_amount_vector = F64Vector128::new_broadcasted(real_step_amount * 4.0);//x4 since we process four real coords at a time (with two F64Vector128s)
 
         for (line_slice, c_imag_scalar) in workload {
@@ -421,11 +341,7 @@ impl Mandelbrot {
     }
 
     unsafe fn update_sse2(self: &mut Self) {
-        if self.max_threads == 1 {
-            self.update_sse2_st();
-        } else {
-            self.update_sse2_mt();
-        }
+        self.update_with_unsafe_line_function(Self::update_sse2_line);
     }
 }
 
