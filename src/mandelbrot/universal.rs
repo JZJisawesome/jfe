@@ -35,6 +35,16 @@ impl Mandelbrot {
         self.update_with_line_function(Self::update_universal_line);
     }
 
+    fn update_universal_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Workload) {
+        for (line_slice, c_imag) in workload {
+            let mut c_real: f64 = starting_c_real;
+            for x in 0..line_slice.len() {
+                line_slice[x] = Self::mandelbrot_iterations_universal(max_iterations, c_real, c_imag);
+                c_real += real_step_amount;
+            }
+        }
+    }
+
     #[inline(always)]
     fn mandelbrot_iterations_universal(max_iterations: usize, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
@@ -56,16 +66,6 @@ impl Mandelbrot {
         }
         //println!("mandelbrot ends returning {}", i);
         return i;
-    }
-
-    fn update_universal_line(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Workload) {
-        for (line_slice, c_imag) in workload {
-            let mut c_real: f64 = starting_c_real;
-            for x in 0..line_slice.len() {
-                line_slice[x] = Self::mandelbrot_iterations_universal(max_iterations, c_real, c_imag);
-                c_real += real_step_amount;
-            }
-        }
     }
 }
 
