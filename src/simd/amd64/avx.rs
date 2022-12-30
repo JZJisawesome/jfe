@@ -14,6 +14,8 @@ use std::mem::MaybeUninit;
 
 use super::{overload_operator_for, implement_nicetransmute_for, implement_cast_from_for, implement_cast_into_for};
 
+use super::{F32Vector128, F64Vector128};
+
 //TODO add avx2_emulation submodule?
 
 /* Constants */
@@ -52,8 +54,8 @@ pub trait Vector256:
     unsafe fn aligned_load_from(self: Self, address: *const Self::AssociatedPrimitive);
     unsafe fn aligned_store_to(self: Self, address: *mut Self::AssociatedPrimitive);
 
-    //unsafe fn get_low_half(self: Self) -> Self::AssociatedHalf;
-    //unsafe fn get_high_half(self: Self) -> Self::AssociatedHalf;
+    fn get_low_half(self: Self) -> Self::AssociatedHalf;
+    fn get_high_half(self: Self) -> Self::AssociatedHalf;
 }
 //TODO what about conversion to/from smaller vectors?
 
@@ -94,7 +96,7 @@ impl F64Vector256 {
 }
 
 impl Vector256 for F64Vector256 {
-    type AssociatedHalf = x86_64::__m128d;
+    type AssociatedHalf = F64Vector128;
     type AssociatedPrimitive = f64;
     type AssociatedPrimitiveArray = [f64; 4];
 
@@ -139,6 +141,13 @@ impl Vector256 for F64Vector256 {
         todo!()
     }
 
+    fn get_low_half(self: Self) -> F64Vector128 {
+        return F64Vector128::from(unsafe { x86_64::_mm256_castpd256_pd128(self.vector) });
+    }
+
+    fn get_high_half(self: Self) -> F64Vector128 {
+        return F64Vector128::from(unsafe { x86_64::_mm256_extractf128_pd(self.vector, 1) });
+    }
 
     //TODO
 }
@@ -146,7 +155,7 @@ impl Vector256 for F64Vector256 {
 impl FloatVector256 for F64Vector256 {
     #[inline(always)]
     fn movemask(self: Self) -> i32 {
-        todo!();
+        return unsafe { x86_64::_mm256_movemask_pd(self.vector) };
     }
 
     //TODO

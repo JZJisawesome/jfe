@@ -11,19 +11,8 @@ use super::Mandelbrot;
 
 use core::arch::x86_64;
 
-use crate::simd::amd64::{Vector128, ComparableVector128, U8Vector128, U64Vector128, F64Vector128};
-
-/*
-fn test() {
-    let the_test1 = U64Vector128::from_workaround(F64Vector128::new_zeroed());
-    let the_test2 = F64Vector128::from_workaround(U64Vector128::new_zeroed());
-    let the_test3: F64Vector128 = U64Vector128::new_zeroed().into_workaround();
-    let the_test4: U64Vector128 = F64Vector128::new_zeroed().into_workaround();
-
-    //This works and avoids the workaround, but can't be used outside of this module...
-    //let the_test5 = U64Vector128::from(Into::<Raw128>::into(F64Vector128::new_zeroed()));
-}
-*/
+use crate::simd::amd64;//DON'T use anything modules within this at the module scope so that we don't unintentionally use it when we didn't mean to
+use crate::simd::amd64::{Vector128, ComparableVector128, U8Vector128, U64Vector128, F64Vector128};//Base types are okay since we assume we are on amd64
 
 /* Constants */
 
@@ -49,14 +38,13 @@ impl Mandelbrot {
     //Detect CPU features and choose the fastest supported implementation
     #[cfg(target_arch = "x86_64")]
     pub(super) unsafe fn update_x86_64(self: &mut Self) {
-        /*if is_x86_feature_detected!("avx2") {
+        if is_x86_feature_detected!("avx2") {
             self.update_avx2();
         } else if is_x86_feature_detected!("avx") {
             self.update_avx();
         } else {
             self.update_sse2();//On x86_64, we can assume SSE2
-        }*/
-        self.update_sse2();//TESTING
+        }
     }
 
     /*     ___     ____  ______       ____
@@ -153,12 +141,13 @@ impl Mandelbrot {
      * /_/   \_\_/   /_/\_\/_/\_\_____|
      *
      * AVX Mandelbrot implementation, interleaving processing of two vectors at once to better mask latency
+     * Also returns results internally as four U64Vector128 as regular AVX dosn't (fully) support 256bit integer vectors
     */
 
     #[cfg(target_arch = "x86_64")]
     #[inline]//But this is okay
     #[target_feature(enable = "avx")]
-    unsafe fn mandelbrot_iterations_avx(self: &Self, c_real_f: [x86_64::__m256d; 2], c_imag_f: [x86_64::__m256d; 2]) -> [x86_64::__m256i; 2] {
+    unsafe fn old_mandelbrot_iterations_avx(self: &Self, c_real_f: [x86_64::__m256d; 2], c_imag_f: [x86_64::__m256d; 2]) -> [x86_64::__m256i; 2] {
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
         let diverge_threshold_squared_f = x86_64::_mm256_set1_pd(diverge_threshold * diverge_threshold);
         let two_f = x86_64::_mm256_set1_pd(2.0);
@@ -213,7 +202,7 @@ impl Mandelbrot {
 
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx")]
-    unsafe fn update_avx(self: &mut Self) {
+    unsafe fn old_update_avx(self: &mut Self) {
         debug_assert!((self.x_samples & 0b111) == 0);//TODO overcome this limitation
         let real_length: f64 = self.max_real - self.min_real;
         let real_step_amount: f64 = real_length / (self.x_samples as f64);
@@ -230,13 +219,127 @@ impl Mandelbrot {
         for x in (0..self.x_samples).step_by(8) {
             let mut c_imag = [x86_64::_mm256_set1_pd(self.min_imag), x86_64::_mm256_set1_pd(self.min_imag)];
             for y in 0..self.y_samples {
-                let result = self.mandelbrot_iterations_avx(c_real, c_imag);
+                let result = self.old_mandelbrot_iterations_avx(c_real, c_imag);
                 let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut x86_64::__m256i;
                 x86_64::_mm256_storeu_si256(pointer, result[1]);
                 x86_64::_mm256_storeu_si256(pointer.offset(1), result[0]);
                 c_imag = [x86_64::_mm256_add_pd(c_imag[0], imag_step_amount_vector), x86_64::_mm256_add_pd(c_imag[1], imag_step_amount_vector)];
             }
             c_real = [x86_64::_mm256_add_pd(c_real[0], real_step_amount_vector), x86_64::_mm256_add_pd(c_real[1], real_step_amount_vector)];
+        }
+        self.update_pending = false;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    #[target_feature(enable = "avx")]
+    unsafe fn mandelbrot_iterations_avx(self: &Self, c_real_f: [amd64::avx::F64Vector256; 2], c_imag_f: [amd64::avx::F64Vector256; 2]) -> [U64Vector128; 4] {
+        use amd64::avx::Vector256;
+        use amd64::avx::FloatVector256;
+        use amd64::avx::F64Vector256;
+        use amd64::avx::ComparableVector256;
+
+        let diverge_threshold: f64 = 2.0;//TODO make this flexible?
+        let diverge_threshold_squared_f = F64Vector256::new_broadcasted(diverge_threshold * diverge_threshold);
+        let two_f = F64Vector256::new_broadcasted(2.0);
+
+        let mut result_i_in_halves = [U64Vector128::new_broadcasted(0); 4];
+
+        let mut incrementor_i_as_f = [F64Vector256::new_broadcasted(f64::from_bits(1)); 2];//We have to do some whacky stuff since we don't have 256 bit integer vectors
+
+        let mut z_real_f = [F64Vector256::new_zeroed(); 2];
+        let mut z_imag_f = [F64Vector256::new_zeroed(); 2];
+
+        for _ in 0..self.max_iterations {
+            //Calculate some values that are used below
+            let z_real_squared_f = [z_real_f[0] * z_real_f[0], z_real_f[1] * z_real_f[1]];
+            let z_imag_squared_f = [z_imag_f[0] * z_imag_f[0], z_imag_f[1] * z_imag_f[1]];
+
+            //Check if the modulus of each z < the diverge value (aka that they haven't diverged)
+            //We do this faster by doing (z_real * z_real) + (z_imag * z_imag) < (2 * 2)
+            let squared_sum_f = [z_real_squared_f[0] + z_imag_squared_f[0], z_real_squared_f[1] + z_imag_squared_f[1]];
+            let compare_i_as_f = [squared_sum_f[0].cmp::<{x86_64::_CMP_LT_OQ}>(diverge_threshold_squared_f), squared_sum_f[1].cmp::<{x86_64::_CMP_LT_OQ}>(diverge_threshold_squared_f)];
+
+            //Get next entries (For each complex number z, z_(n+1) = z_n^2 + c)
+            //We do this before the diverge check below, instead of after like we used to because it better masks the latency of
+            //A) The comparisons performed above to the check below
+            //B) The calculation of the next z_imag and z_real to the squaring at the start of the next iteration of the loop
+            //Also this dosn't compromise the latency of the squaring at the start of the loop to this since we still have the compare above in-between
+            let temp_z_real_f = [z_real_squared_f[0] - z_imag_squared_f[0] + c_real_f[0], z_real_squared_f[1] - z_imag_squared_f[1] + c_real_f[1]];
+            z_imag_f = [(two_f * z_real_f[0] * z_imag_f[0]) + c_imag_f[0], (two_f * z_real_f[1] * z_imag_f[1]) + c_imag_f[1]];
+            z_real_f = temp_z_real_f;
+
+
+            //If both complex numbers have diverged (entire vector is 0), return
+            if (compare_i_as_f[0].movemask() == 0) && (compare_i_as_f[1].movemask() == 0) {
+                break;
+            }
+
+            //Increment the corresponding count only if we haven't converged yet
+            incrementor_i_as_f = [incrementor_i_as_f[0] & compare_i_as_f[0], incrementor_i_as_f[1] & compare_i_as_f[1]];//If a number diverged, never increment its iteration count again
+
+            //We then split the vector apart and add the halves seperatly since we don't have AVX2; so four additions in total
+            let incrementor_i_as_f_in_halves = [
+                incrementor_i_as_f[0].get_high_half(), incrementor_i_as_f[0].get_low_half(),
+                incrementor_i_as_f[1].get_high_half(), incrementor_i_as_f[1].get_low_half()
+            ];
+
+            let incrementor_i_in_halves: [U64Vector128; 4] = [
+                incrementor_i_as_f_in_halves[0].into(), incrementor_i_as_f_in_halves[1].into(),
+                incrementor_i_as_f_in_halves[2].into(), incrementor_i_as_f_in_halves[3].into()
+            ];
+
+            result_i_in_halves = [
+                incrementor_i_in_halves[0] + result_i_in_halves[0], incrementor_i_in_halves[1] + result_i_in_halves[1],
+                incrementor_i_in_halves[2] + result_i_in_halves[2], incrementor_i_in_halves[3] + result_i_in_halves[3]
+            ];
+        }
+
+        return result_i_in_halves;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx")]
+    unsafe fn update_avx(self: &mut Self) {
+        use amd64::avx::Vector256;
+        use amd64::avx::F64Vector256;
+
+        debug_assert!((self.x_samples & 0b111) == 0);//TODO overcome this limitation
+
+
+        let real_length: f64 = self.max_real - self.min_real;
+        let real_step_amount: f64 = real_length / (self.x_samples as f64);
+        let imag_length: f64 = self.max_imag - self.min_imag;
+        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
+
+        let iterations_pointer = self.iterations.as_mut_ptr();
+
+        let real_step_amount_vector = F64Vector256::new_broadcasted(real_step_amount * 8.0);//x8 since we process eight real coords at a time (with two F64Vector256s)
+        let imag_step_amount_vector = F64Vector256::new_broadcasted(imag_step_amount);//We only process one imaginary coord at a time
+
+        let mut c_real = [
+            F64Vector256::from([
+                self.min_real + (real_step_amount * 7.0), self.min_real + (real_step_amount * 6.0),
+                self.min_real + (real_step_amount * 5.0), self.min_real + (real_step_amount * 4.0)
+            ]),
+            F64Vector256::from([
+                self.min_real + (real_step_amount * 3.0), self.min_real + (real_step_amount * 2.0),
+                self.min_real + real_step_amount, self.min_real
+            ]),
+        ];
+
+        for x in (0..self.x_samples).step_by(8) {
+            let mut c_imag = [F64Vector256::new_broadcasted(self.min_imag); 2];
+            for y in 0..self.y_samples {
+                let result = self.mandelbrot_iterations_avx(c_real, c_imag);
+                let pointer = iterations_pointer.offset((x + (y * self.x_samples)) as isize) as *mut u64;
+                result[3].unaligned_store_to(pointer);
+                result[2].unaligned_store_to(pointer.offset(2));
+                result[1].unaligned_store_to(pointer.offset(4));
+                result[0].unaligned_store_to(pointer.offset(6));
+                c_imag = [c_imag[0] + imag_step_amount_vector, c_imag[1] + imag_step_amount_vector];
+            }
+            c_real = [c_real[0] + real_step_amount_vector, c_real[1] + real_step_amount_vector];
         }
         self.update_pending = false;
     }
@@ -478,6 +581,26 @@ mod benches {
             b.iter(|| -> Mandelbrot {
                 let mut copy = mandelbrot.clone();
                 unsafe { copy.update_avx() };
+                return copy;
+            });
+        }
+    }
+
+    #[bench]
+    #[cfg(target_arch = "x86_64")]
+    fn old_update_avx(b: &mut Bencher) {
+        if is_x86_feature_detected!("avx") {
+            let mandelbrot = Mandelbrot::new(
+                1024,
+                128,
+                128,
+                -2.3, 0.8,
+                -1.1, 1.1
+            );
+
+            b.iter(|| -> Mandelbrot {
+                let mut copy = mandelbrot.clone();
+                unsafe { copy.old_update_avx() };
                 return copy;
             });
         }

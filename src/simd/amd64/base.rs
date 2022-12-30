@@ -241,8 +241,7 @@ define_integervector128_struct_with_primitive!(I32Vector128, i32);
 define_integervector128_struct_with_primitive!(I64Vector128, i64);*/
 
 define_integervector128_struct_with_primitive!(U8Vector128, u8);
-/*
-define_integervector128_struct_with_primitive!(U16Vector128, u16);
+/*define_integervector128_struct_with_primitive!(U16Vector128, u16);
 define_integervector128_struct_with_primitive!(U32Vector128, u32);*/
 define_integervector128_struct_with_primitive!(U64Vector128, u64);
 
