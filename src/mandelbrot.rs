@@ -90,7 +90,11 @@ impl BaseFractal for Mandelbrot {
 
     //Setters
     fn set_max_threads(self: &mut Self, max_threads: usize) {
-        self.max_threads = max_threads;
+        if max_threads != 0 {
+            self.max_threads = max_threads;
+        } else {
+            self.max_threads = std::thread::available_parallelism().expect("Failed to auto-determine the max number of threads to use when calling set_max_threads with 0").get();
+        }
     }
 
     //Update Samples

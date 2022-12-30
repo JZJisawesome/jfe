@@ -97,14 +97,13 @@ impl Mandelbrot {
         workloads.resize_with(self.max_threads, || { Vec::<LineWorkload>::new() });
 
         //Distribute work by splitting into lines
-        //TODO fix this
         //Split into horizontal lines
-        let mut c_real: f64 = self.min_real;
+        let mut c_imag: f64 = self.min_imag;
         let mut counter_across_threads = 0;
         for line_slice in self.iterations.chunks_mut(self.x_samples) {
-            workloads[counter_across_threads].push((line_slice, c_real));
+            workloads[counter_across_threads].push((line_slice, c_imag));
 
-            c_real += real_step_amount;
+            c_imag += imag_step_amount;
 
             counter_across_threads += 1;
             if counter_across_threads == self.max_threads {
@@ -117,14 +116,12 @@ impl Mandelbrot {
         thread::scope(|s| {
             while let Some(workload) = workloads.pop() {
                 let max_iterations_copy = self.max_iterations;
-                let y_samples_copy = self.y_samples;
-                let min_imag_copy = self.min_imag;
-                let imag_length_copy = imag_length;
-                let imag_step_amount_copy = imag_step_amount;
+                let min_real_copy = self.min_real;
+                let real_step_amount_copy = real_step_amount;
 
                 s.spawn(move || {
                     Self::update_universal_mt_thread(
-                        max_iterations_copy, y_samples_copy, min_imag_copy, imag_length_copy, imag_step_amount_copy,
+                        max_iterations_copy, min_real_copy, real_step_amount_copy,
                         workload
                     );
                 });
@@ -133,12 +130,12 @@ impl Mandelbrot {
         self.update_pending = false;
     }
 
-    fn update_universal_mt_thread(max_iterations: usize, y_samples: usize, starting_c_imag: f64, imag_length: f64, imag_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
-        for (line_slice, c_real) in workload {
-            let mut c_imag: f64 = starting_c_imag;
-            for y in 0..y_samples {
-                line_slice[y] = Self::mandelbrot_iterations_universal(max_iterations, c_real, c_imag);
-                c_imag += imag_step_amount;
+    fn update_universal_mt_thread(max_iterations: usize, starting_c_real: f64, real_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
+        for (line_slice, c_imag) in workload {
+            let mut c_real: f64 = starting_c_real;
+            for x in 0..line_slice.len() {
+                line_slice[x] = Self::mandelbrot_iterations_universal(max_iterations, c_real, c_imag);
+                c_real += real_step_amount;
             }
         }
     }
