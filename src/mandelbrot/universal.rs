@@ -33,7 +33,7 @@ use std::thread::JoinHandle;
 
 impl Mandelbrot {
     #[inline(always)]
-    fn mandelbrot_iterations_universal(self: &Self, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
+    fn mandelbrot_iterations_universal(max_iterations: usize, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
         //println!("mandelbrot iteration with params: {} {}", c_real, c_imag);
         let diverge_threshold: f64 = 2.0;//TODO make this flexible?
 
@@ -44,7 +44,7 @@ impl Mandelbrot {
         //We exit the loop in two cases: if we reach MAX_ITERATIONS (meaning we assume the c value produces a bounded series)
         //or the modulus of the complex number exceeds the diverge_threshold (meaning the c value produces an unbounded series)
         let mut i: usize = 0;
-        while (i < self.max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (diverge_threshold * diverge_threshold)) {
+        while (i < max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (diverge_threshold * diverge_threshold)) {
             //println!("iteration {} starts: z_real {}, z_imag {}", i, z_real, z_imag);
             //z_(n+1) = z_n^2 + c
             let next_z_real = (z_real * z_real) - (z_imag * z_imag) + c_real;
@@ -76,7 +76,7 @@ impl Mandelbrot {
         for x in 0..self.x_samples {
             let mut c_imag: f64 = self.min_imag;
             for y in 0..self.y_samples {
-                *self.at(x, y) = self.mandelbrot_iterations_universal(c_real, c_imag);
+                *self.at(x, y) = Self::mandelbrot_iterations_universal(self.max_iterations, c_real, c_imag);
                 c_imag += imag_step_amount;
             }
             c_real += real_step_amount;
@@ -97,7 +97,7 @@ impl Mandelbrot {
         workloads.resize_with(self.max_threads, || { Vec::<LineWorkload>::new() });
 
         //Distribute work by splitting into lines
-        //let mut join_handle_vector = Vec::<JoinHandle<()>>::with_capacity(self.max_threads);
+        //TODO fix this
         //Split into horizontal lines
         let mut c_real: f64 = self.min_real;
         let mut counter_across_threads = 0;
@@ -116,6 +116,7 @@ impl Mandelbrot {
         debug_assert!(workloads.len() == self.max_threads);
         thread::scope(|s| {
             while let Some(workload) = workloads.pop() {
+                let max_iterations_copy = self.max_iterations;
                 let y_samples_copy = self.y_samples;
                 let min_imag_copy = self.min_imag;
                 let imag_length_copy = imag_length;
@@ -123,7 +124,7 @@ impl Mandelbrot {
 
                 s.spawn(move || {
                     Self::update_universal_mt_thread(
-                        y_samples_copy, min_imag_copy, imag_length_copy, imag_step_amount_copy,
+                        max_iterations_copy, y_samples_copy, min_imag_copy, imag_length_copy, imag_step_amount_copy,
                         workload
                     );
                 });
@@ -132,8 +133,14 @@ impl Mandelbrot {
         self.update_pending = false;
     }
 
-    fn update_universal_mt_thread(y_samples: usize, starting_c_imag: f64, imag_length: f64, imag_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
-        todo!();
+    fn update_universal_mt_thread(max_iterations: usize, y_samples: usize, starting_c_imag: f64, imag_length: f64, imag_step_amount: f64, workload: Vec::<(&mut [usize], f64)>) {
+        for (line_slice, c_real) in workload {
+            let mut c_imag: f64 = starting_c_imag;
+            for y in 0..y_samples {
+                line_slice[y] = Self::mandelbrot_iterations_universal(max_iterations, c_real, c_imag);
+                c_imag += imag_step_amount;
+            }
+        }
     }
 }
 
