@@ -20,8 +20,8 @@ use super::{overload_operator_for, implement_nicetransmute_for, implement_cast_f
 
 /* Macros */
 
-macro_rules! define_integervector128_struct_with_primitive {
-    ($t: ident, $primitive: ident) => {
+macro_rules! define_integervector128_struct {
+    ($t: ident) => {
         //Basic setup of the new struct
         #[derive(Copy, Clone, Debug)]
         #[repr(align(16))]
@@ -235,15 +235,15 @@ pub struct F64Vector128 {//TODO this will be Vector128 + AsRef<x86_64::__m128d> 
 //TODO figure out how to go From/Into between the IntegerVector types
 
 //TODO will still need to implement add, subtract, multiply, divide, shl, shr, etc. for each of these
-/*define_integer_vector128_struct_with_primitive!(I8Vector128, i8);//TODO this also supports fn movemask(self: Self) -> i32;
-define_integervector128_struct_with_primitive!(I16Vector128, i16);
-define_integervector128_struct_with_primitive!(I32Vector128, i32);
-define_integervector128_struct_with_primitive!(I64Vector128, i64);*/
+/*define_integer_vector128_struct!(I8Vector128);//TODO this also supports fn movemask(self: Self) -> i32;
+define_integervector128_struct!(I16Vector128);
+define_integervector128_struct!(I32Vector128);
+define_integervector128_struct!(I64Vector128);*/
 
-define_integervector128_struct_with_primitive!(U8Vector128, u8);
-/*define_integervector128_struct_with_primitive!(U16Vector128, u16);
-define_integervector128_struct_with_primitive!(U32Vector128, u32);*/
-define_integervector128_struct_with_primitive!(U64Vector128, u64);
+define_integervector128_struct!(U8Vector128);
+/*define_integervector128_struct!(U16Vector128);
+define_integervector128_struct!(U32Vector128);*/
+define_integervector128_struct!(U64Vector128);
 
 /* Associated Functions and Methods */
 

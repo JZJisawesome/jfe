@@ -64,7 +64,6 @@ impl Mandelbrot {
             z_imag = next_z_imag;
             i += 1;
         }
-        //println!("mandelbrot ends returning {}", i);
         return i;
     }
 }
