@@ -76,3 +76,30 @@ impl Mandelbrot {
 /* Functions */
 
 //TODO
+
+/* Benches */
+
+#[cfg_attr(feature = "nightly-features-benches", cfg(test))]
+#[cfg(feature = "nightly-features-benches")]
+mod benches {
+    extern crate test;
+    use test::Bencher;
+    use super::*;
+
+    #[bench]
+    fn update_universal(b: &mut Bencher) {
+        let mandelbrot = Mandelbrot::new(
+            1024,
+            128,
+            128,
+            -2.3, 0.8,
+            -1.1, 1.1
+        );
+
+        b.iter(|| -> Mandelbrot {
+            let mut copy = mandelbrot.clone();
+            copy.update_universal();
+            return copy;
+        });
+    }
+}
