@@ -1,3 +1,12 @@
+/* jfe.rs
+ * By: John Jekel
+ * Copyright (C) 2022-2023 John Jekel
+ * See the LICENSE file at the root of the project for licensing info.
+ *
+ * JFE Command-line Interfact
+ *
+*/
+
 use jfe::FractalBox::EscapeTime;
 
 fn main() {

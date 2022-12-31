@@ -1,7 +1,9 @@
-/* NAME//TODO
+/* base.rs
  * By: John Jekel
+ * Copyright (C) 2022-2023 John Jekel
+ * See the LICENSE file at the root of the project for licensing info.
  *
- * TODO description
+ * Base AMD64 abstractions for Rust (SSE2 and below)
  *
 */
 
