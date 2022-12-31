@@ -10,8 +10,6 @@
 use super::Mandelbrot;
 use super::Workload;
 
-use std::thread;
-
 /* Constants */
 
 //TODO

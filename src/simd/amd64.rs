@@ -5,6 +5,11 @@
  *
 */
 
+//TODO until things are finished
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
+
 /* Imports */
 
 pub mod base;

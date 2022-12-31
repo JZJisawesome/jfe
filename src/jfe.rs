@@ -1,8 +1,13 @@
-use jfe::BaseFractal;
 use jfe::FractalBox::EscapeTime;
 
 fn main() {
-    if let Ok(sections) = jfe::ini::parse_ini_file(std::path::Path::new("../../examples.ini")) {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        println!("Expected 1 argument (path to ini file)");
+        return;
+    }
+
+    if let Ok(sections) = jfe::ini::parse_ini_file(std::path::Path::new(&args[1])) {
         for (section_name, section) in sections {
             println!("Processing the {} section", section_name);
             if let Ok(fractal_box) = jfe::ini::section_to_fractal(&section) {
@@ -24,7 +29,7 @@ fn main() {
                         }
 
                         let tga_file_vec = create_tga_vec(fractal.get_x_samples() as u16, fractal.get_y_samples() as u16, 24, &tga_image_data);
-                        std::fs::write(section_name + ".tga", &tga_file_vec);
+                        std::fs::write("/tmp/".to_string() + &section_name + ".tga", &tga_file_vec).unwrap();
                     }
                     _ => { todo!(); }
                 }

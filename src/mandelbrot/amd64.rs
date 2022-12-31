@@ -15,8 +15,6 @@ use core::arch::x86_64;
 use crate::simd::amd64;//DON'T use anything modules within this at the module scope so that we don't unintentionally use it when we didn't mean to
 use crate::simd::amd64::{Vector128, ComparableVector128, U8Vector128, U64Vector128, F64Vector128};//Base types are okay since we assume we are on amd64
 
-use std::thread;
-
 /* Constants */
 
 //TODO

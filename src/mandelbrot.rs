@@ -10,8 +10,6 @@
 mod universal;
 mod amd64;
 
-use std::ops::IndexMut;
-
 use crate::BaseFractal;
 use crate::EscapeTimeFractal;
 
@@ -79,13 +77,6 @@ impl Mandelbrot {
             iterations: new_iterations_vec,
             update_pending: true
         };
-    }
-
-    #[inline(always)]
-    fn at(self: &mut Self, x: usize, y: usize) -> &mut usize {//unchecked for speed in release builds
-        debug_assert!(x < self.x_samples);
-        debug_assert!(y < self.y_samples);
-        return self.iterations.index_mut(x + (y * self.x_samples));
     }
 
     fn update_with_line_function(self: &mut Self, function: fn(usize, f64, f64, Workload)) {
