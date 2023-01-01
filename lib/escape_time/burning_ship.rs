@@ -12,7 +12,7 @@
 use std::ops::IndexMut;
 
 use crate::BaseFractal;
-use crate::EscapeTimeFractal;
+use super::EscapeTimeFractal;
 
 /* Constants */
 

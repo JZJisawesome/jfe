@@ -13,7 +13,7 @@ mod universal;
 mod amd64;
 
 use crate::BaseFractal;
-use crate::EscapeTimeFractal;
+use super::EscapeTimeFractal;
 
 use std::thread;
 

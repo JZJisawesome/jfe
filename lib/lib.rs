@@ -14,8 +14,6 @@
 
 /* Imports */
 
-pub mod mandelbrot;
-pub mod burning_ship;
 //mod numerical_traits;
 pub mod ini;
 
@@ -23,6 +21,8 @@ mod simd;
 
 //pub mod fractal_names;
 use std::fmt::Debug;
+
+pub mod escape_time;
 
 //use std::ops::Index;
 
@@ -46,7 +46,7 @@ use std::fmt::Debug;
 pub enum FractalBox {
     IFS(Box<dyn IFSFractal>),
     StrangeAttractor(Box<dyn StrangeAttractorFractal>),
-    EscapeTime(Box<dyn EscapeTimeFractal>),
+    EscapeTime(Box<dyn escape_time::EscapeTimeFractal>),
     Random(Box<dyn RandomFractal>),
     FiniteSubdivision(Box<dyn FiniteSubdivisionFractal>)
 }
@@ -68,29 +68,6 @@ pub trait IFSFractal: BaseFractal {
 
 pub trait StrangeAttractorFractal: BaseFractal {
     //TODO
-}
-
-pub trait EscapeTimeFractal: BaseFractal {
-    //Getters
-    fn get_max_iterations(self: &Self) -> usize;
-    fn get_x_samples(self: &Self) -> usize;
-    fn get_y_samples(self: &Self) -> usize;
-    fn get_min_x(self: &Self) -> f64;//For the x axis or the real axis
-    fn get_max_x(self: &Self) -> f64;//For the x axis or the real axis
-    fn get_min_y(self: &Self) -> f64;//For the y axis or the imaginary axis
-    fn get_max_y(self: &Self) -> f64;//For the y axis or the imaginary axis
-
-    //Setters
-    fn set_max_iterations(self: &mut Self, max_iterations: usize);
-    fn set_x_samples(self: &mut Self, x_samples: usize);
-    fn set_y_samples(self: &mut Self, y_samples: usize);
-    fn set_min_x(self: &mut Self, min_x: f64);//For the x axis or the real axis
-    fn set_max_x(self: &mut Self, max_x: f64);//For the x axis or the real axis
-    fn set_min_y(self: &mut Self, min_y: f64);//For the y axis or the imaginary axis
-    fn set_max_y(self: &mut Self, max_y: f64);//For the y axis or the imaginary axis
-
-    //Access Samples Storage
-    fn samples_ref(self: &Self) -> Option::<&[usize]>;//Returns None if update() wasn't called since the last change to arguments/since construction
 }
 
 pub trait RandomFractal: BaseFractal {

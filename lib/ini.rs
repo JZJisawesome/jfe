@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::fs::read;
 use crate::FractalBox;
-use crate::EscapeTimeFractal;
+use crate::escape_time::EscapeTimeFractal;
+use crate::escape_time;
 
 /* Constants */
 
@@ -74,7 +75,7 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
             let mut escape_time_fractal_box: Box<dyn EscapeTimeFractal>;
             match subtype_string {
                 "mandelbrot" => {
-                    escape_time_fractal_box = Box::new(crate::mandelbrot::Mandelbrot::new(
+                    escape_time_fractal_box = Box::new(escape_time::mandelbrot::Mandelbrot::new(
                         1,
                         1,
                         1,
@@ -83,7 +84,7 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
                     ));
                 },
                 "burning_ship" => {
-                    escape_time_fractal_box = Box::new(crate::burning_ship::BurningShip::new(
+                    escape_time_fractal_box = Box::new(escape_time::burning_ship::BurningShip::new(
                         1,
                         1,
                         1,

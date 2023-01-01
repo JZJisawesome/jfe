@@ -9,7 +9,7 @@ edition = "2021"
 
 [lib]
 name = "jfe"
-path = "src/lib.rs"
+path = "lib/lib.rs"
 
 [[bin]]
 name = "jfe"
@@ -23,6 +23,9 @@ path = "src/server.rs"
 default = []
 nightly-features = ["nightly-features-benches"]
 nightly-features-benches = []
+
+[profile.dev]
+incremental = true
 
 [profile.release]
 codegen-units = 1
