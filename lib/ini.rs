@@ -91,6 +91,30 @@ pub fn section_to_fractal(fractal_ini_section: &Section) -> Result<FractalBox, (
                         0.0, 0.0,
                         0.0, 0.0
                     ));
+                },
+                "quadratic_julia" => {
+                    let c_real;
+                    if let Some(Value::Float(float)) = fractal_ini_section.get("c_real") {
+                        c_real = *float;
+                    } else {
+                        return Err(());
+                    }
+
+                    let c_imag;
+                    if let Some(Value::Float(float)) = fractal_ini_section.get("c_imag") {
+                        c_imag = *float;
+                    } else {
+                        return Err(());
+                    }
+
+                    escape_time_fractal_box = Box::new(escape_time::quadratic_julia::QuadraticJulia::new(
+                        1,
+                        1,
+                        1,
+                        0.0, 0.0,
+                        0.0, 0.0,
+                        c_real, c_imag
+                    ));
                 }
                 _ => { return Err(()); },
             }

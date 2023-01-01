@@ -1,9 +1,9 @@
-/* burning_ship.rs
+/* standard_newton.rs
  * By: John Jekel
  * Copyright (C) 2022-2023 John Jekel
  * See the LICENSE file at the root of the project for licensing info.
  *
- * Burning Ship Escape Time Fractal
+ * Standard Newton Escape Time Fractal
  *
 */
 
@@ -29,7 +29,7 @@ use super::EscapeTimeFractal;
 /* Types */
 
 #[derive(Debug)]
-pub struct BurningShip {
+pub struct StandardNewton {
     max_iterations: usize,
     x_samples: usize,
     y_samples: usize,
@@ -40,17 +40,17 @@ pub struct BurningShip {
     max_threads: usize,
 
     iterations: Vec::<usize>,//For cheap resizing in case the user changes x_samples or y_samples
-    update_pending: bool,
+    update_pending: bool
 }
 
-impl BurningShip {
+impl StandardNewton {
     //NOTE: it is okay if min/max real/imag values are flipped, it will just flip the image
     pub fn new(
         max_iterations: usize,
         x_samples: usize, y_samples: usize,
         min_real: f64, max_real: f64,
         min_imag: f64, max_imag: f64
-    ) -> BurningShip {
+    ) -> StandardNewton {
         assert!(max_iterations > 0, "Must at least iterate once");
         assert!(x_samples != 0, "x_samples must be non-zero");
         assert!(y_samples != 0, "y_samples must be non-zero");
@@ -58,7 +58,7 @@ impl BurningShip {
         let mut new_iterations_vec = Vec::<usize>::with_capacity(x_samples * y_samples);
         new_iterations_vec.resize(x_samples * y_samples, 0);
 
-        return BurningShip {
+        return StandardNewton {
             max_iterations: max_iterations,
             x_samples: x_samples,
             y_samples: y_samples,
@@ -73,29 +73,8 @@ impl BurningShip {
         };
     }
 
-    fn burning_ship_iterations(self: &Self, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
-        let diverge_threshold: f64 = 2.0;//TODO make this flexible?
-
-        //z_0 = 0
-        let mut z_real: f64 = 0.0;
-        let mut z_imag: f64 = 0.0;
-
-        //We exit the loop in two cases: if we reach MAX_ITERATIONS (meaning we assume the c value produces a bounded series)
-        //or the modulus of the complex number exceeds the diverge_threshold (meaning the c value produces an unbounded series)
-        let mut i: usize = 0;
-        while (i < self.max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (diverge_threshold * diverge_threshold)) {
-
-            //z_(n+1) = (abs(Re(z_n)) + i(abs(Im(z_n))))^2 + c
-            let next_z_real = (z_real * z_real) - (z_imag * z_imag) + c_real;
-            let next_z_imag = (2.0 * z_real.abs() * z_imag.abs()) + c_imag;
-            z_real = next_z_real;
-            z_imag = next_z_imag;
-
-            i += 1;
-        }
-
-        return i;
-    }
+    //#[inline(always)]
+    //fn function(c_real: f64, c_imag: f64) ->
 
     #[inline(always)]
     fn at(self: &mut Self, x: usize, y: usize) -> &mut usize {//unchecked for speed in release builds
@@ -105,7 +84,7 @@ impl BurningShip {
     }
 }
 
-impl BaseFractal for BurningShip {
+impl BaseFractal for StandardNewton {
     //Getters
     fn get_max_threads(self: &Self) -> usize {
         return self.max_threads;
@@ -118,25 +97,12 @@ impl BaseFractal for BurningShip {
 
     //Update Samples
     fn update(self: &mut Self) {
-        let real_length: f64 = self.max_real - self.min_real;
-        let real_step_amount: f64 = real_length / (self.x_samples as f64);
-        let imag_length: f64 = self.max_imag - self.min_imag;
-        let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
-
-        let mut c_real: f64 = self.min_real;
-        for x in 0..self.x_samples {
-            let mut c_imag: f64 = self.min_imag;
-            for y in 0..self.y_samples {
-                *self.at(x, y) = self.burning_ship_iterations(c_real, c_imag);
-                c_imag += imag_step_amount;
-            }
-            c_real += real_step_amount;
-        }
+        todo!();
         self.update_pending = false;
     }
 }
 
-impl EscapeTimeFractal for BurningShip {
+impl EscapeTimeFractal for StandardNewton {
     //Getters
     fn get_max_iterations(self: &Self) -> usize {
         return self.max_iterations;

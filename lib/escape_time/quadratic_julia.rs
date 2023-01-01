@@ -1,9 +1,9 @@
-/* burning_ship.rs
+/* quadradic_julia.rs
  * By: John Jekel
  * Copyright (C) 2022-2023 John Jekel
  * See the LICENSE file at the root of the project for licensing info.
  *
- * Burning Ship Escape Time Fractal
+ * Quadratic Polynomial Julia Set Escape Time Fractals
  *
 */
 
@@ -29,7 +29,7 @@ use super::EscapeTimeFractal;
 /* Types */
 
 #[derive(Debug)]
-pub struct BurningShip {
+pub struct QuadraticJulia {
     max_iterations: usize,
     x_samples: usize,
     y_samples: usize,
@@ -41,16 +41,20 @@ pub struct BurningShip {
 
     iterations: Vec::<usize>,//For cheap resizing in case the user changes x_samples or y_samples
     update_pending: bool,
+
+    c_real: f64,
+    c_imag: f64
 }
 
-impl BurningShip {
+impl QuadraticJulia {
     //NOTE: it is okay if min/max real/imag values are flipped, it will just flip the image
     pub fn new(
         max_iterations: usize,
         x_samples: usize, y_samples: usize,
         min_real: f64, max_real: f64,
-        min_imag: f64, max_imag: f64
-    ) -> BurningShip {
+        min_imag: f64, max_imag: f64,
+        c_real: f64, c_imag: f64
+    ) -> QuadraticJulia {
         assert!(max_iterations > 0, "Must at least iterate once");
         assert!(x_samples != 0, "x_samples must be non-zero");
         assert!(y_samples != 0, "y_samples must be non-zero");
@@ -58,7 +62,7 @@ impl BurningShip {
         let mut new_iterations_vec = Vec::<usize>::with_capacity(x_samples * y_samples);
         new_iterations_vec.resize(x_samples * y_samples, 0);
 
-        return BurningShip {
+        return QuadraticJulia {
             max_iterations: max_iterations,
             x_samples: x_samples,
             y_samples: y_samples,
@@ -69,28 +73,42 @@ impl BurningShip {
             max_threads: 1,
 
             iterations: new_iterations_vec,
-            update_pending: true
+            update_pending: true,
+            c_real: c_real,
+            c_imag: c_imag
         };
     }
 
-    fn burning_ship_iterations(self: &Self, c_real: f64, c_imag: f64) -> usize {//Returns MAX_ITERATIONS if it is bounded
-        let diverge_threshold: f64 = 2.0;//TODO make this flexible?
+    //Getters
+    fn get_c_real(self: &Self) -> f64 {
+        return self.c_real;
+    }
 
-        //z_0 = 0
-        let mut z_real: f64 = 0.0;
-        let mut z_imag: f64 = 0.0;
+    fn get_c_imag(self: &Self) -> f64 {
+        return self.c_imag;
+    }
 
-        //We exit the loop in two cases: if we reach MAX_ITERATIONS (meaning we assume the c value produces a bounded series)
-        //or the modulus of the complex number exceeds the diverge_threshold (meaning the c value produces an unbounded series)
+    //Setters
+    fn set_c_real(self: &mut Self, c_real: f64) {
+        self.c_real = c_real;
+        self.update_pending = true;
+    }
+
+    fn set_c_imag(self: &mut Self, c_imag: f64) {
+        self.c_imag = c_imag;
+        self.update_pending = true;
+    }
+
+    fn quadratic_julia_iterations(self: &Self, mut z_real: f64, mut z_imag: f64) -> usize {
+        let escape_radius: f64 = 2.0;//TODO make this flexible?
+
         let mut i: usize = 0;
-        while (i < self.max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (diverge_threshold * diverge_threshold)) {
-
-            //z_(n+1) = (abs(Re(z_n)) + i(abs(Im(z_n))))^2 + c
-            let next_z_real = (z_real * z_real) - (z_imag * z_imag) + c_real;
-            let next_z_imag = (2.0 * z_real.abs() * z_imag.abs()) + c_imag;
+        while (i < self.max_iterations) && (((z_real * z_real) + (z_imag * z_imag)) < (escape_radius * escape_radius)) {
+            //z_(n+1) = z^2 + c
+            let next_z_real = (z_real * z_real) + (z_imag * z_imag) + self.c_real;
+            let next_z_imag = (2.0 * z_real.abs() * z_imag.abs()) + self.c_imag;
             z_real = next_z_real;
             z_imag = next_z_imag;
-
             i += 1;
         }
 
@@ -105,7 +123,7 @@ impl BurningShip {
     }
 }
 
-impl BaseFractal for BurningShip {
+impl BaseFractal for QuadraticJulia {
     //Getters
     fn get_max_threads(self: &Self) -> usize {
         return self.max_threads;
@@ -123,20 +141,20 @@ impl BaseFractal for BurningShip {
         let imag_length: f64 = self.max_imag - self.min_imag;
         let imag_step_amount: f64 = imag_length / (self.y_samples as f64);
 
-        let mut c_real: f64 = self.min_real;
+        let mut z_real: f64 = self.min_real;
         for x in 0..self.x_samples {
-            let mut c_imag: f64 = self.min_imag;
+            let mut z_imag: f64 = self.min_imag;
             for y in 0..self.y_samples {
-                *self.at(x, y) = self.burning_ship_iterations(c_real, c_imag);
-                c_imag += imag_step_amount;
+                *self.at(x, y) = self.quadratic_julia_iterations(z_real, z_imag);
+                z_imag += imag_step_amount;
             }
-            c_real += real_step_amount;
+            z_real += real_step_amount;
         }
         self.update_pending = false;
     }
 }
 
-impl EscapeTimeFractal for BurningShip {
+impl EscapeTimeFractal for QuadraticJulia {
     //Getters
     fn get_max_iterations(self: &Self) -> usize {
         return self.max_iterations;

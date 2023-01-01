@@ -1,14 +1,18 @@
-/* NAME//TODO
+/* escape_time.rs
  * By: John Jekel
+ * Copyright (C) 2022-2023 John Jekel
+ * See the LICENSE file at the root of the project for licensing info.
  *
- * TODO description
+ * Escape Time Fractals
  *
 */
 
 /* Imports */
 
-pub mod mandelbrot;
 pub mod burning_ship;
+pub mod mandelbrot;
+pub mod standard_newton;
+pub mod quadratic_julia;
 
 use crate::BaseFractal;
 
